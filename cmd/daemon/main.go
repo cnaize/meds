@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"runtime"
+	"sync"
 
 	"github.com/appleboy/graceful"
 
@@ -18,18 +19,29 @@ func main() {
 	flag.UintVar(&cfg.QCount, "qcount", uint(runtime.GOMAXPROCS(0)), "set nfqueue count")
 	flag.Parse()
 
-	// create filters
-	filters := []core.Filter{
-		filter.NewTrue(),
-	}
-
 	// create logger
 	logger := graceful.NewLogger()
 	logger.Infof("Running Meds...")
 
 	// main context
-	mainCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	mainCtx, mainCancel := context.WithCancel(context.Background())
+	defer mainCancel()
+
+	// create filters
+	filters := []core.Filter{
+		filter.NewFireHOL(logger),
+	}
+
+	// load filters
+	var wg sync.WaitGroup
+	for i, filter := range filters {
+		wg.Go(func() {
+			if err := filter.Load(mainCtx); err != nil {
+				logger.Errorf("%d: failed to load filter: %s", i, err.Error())
+			}
+		})
+	}
+	wg.Wait()
 
 	// create queue
 	q := core.NewQueue(cfg.QCount, filters, logger)
@@ -37,7 +49,7 @@ func main() {
 	// run queue
 	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(logger))
 	m.AddRunningJob(func(ctx context.Context) error {
-		defer cancel()
+		defer mainCancel()
 
 		select {
 		case <-ctx.Done():

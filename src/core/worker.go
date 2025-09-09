@@ -29,6 +29,7 @@ func NewWorker(qnum uint16, filters []Filter, logger graceful.Logger) *Worker {
 func (w *Worker) Run(ctx context.Context) error {
 	w.logger.Infof("Running worker, qnum: %d...", w.qnum)
 
+	// open nfqueue
 	nfq, err := nfqueue.Open(&nfqueue.Config{
 		NfQueue:      w.qnum,
 		MaxQueueLen:  0xFF,
@@ -39,48 +40,59 @@ func (w *Worker) Run(ctx context.Context) error {
 		return fmt.Errorf("open: %w", err)
 	}
 
-	nfq.RegisterWithErrorFunc(ctx,
-		func(a nfqueue.Attribute) int {
-			w.logger.Infof("packet received")
-
-			if a.Payload == nil {
-				w.logger.Infof("empty payload - accept")
-
-				nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-				return 0
-			}
-
-			packet := gopacket.NewPacket(*a.Payload, layers.IPProtocolIPv4, gopacket.NoCopy)
-			if err := packet.ErrorLayer(); err != nil {
-				w.logger.Infof("error occured: %s - accept", err.Error())
-
-				nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-				return 0
-			}
-
-			for _, filter := range w.filters {
-				if !filter.Check(packet) {
-					w.logger.Infof("check failed - block")
-
-					nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
-					return 0
-				}
-			}
-
-			return nfqueue.NfAccept
-		},
-		func(e error) int {
-			w.logger.Infof("error received: %s - accept", e.Error())
-
-			return nfqueue.NfAccept
-		},
-	)
+	// register nfqueue handlers
+	nfq.RegisterWithErrorFunc(ctx, w.hookFn, w.errFn)
 
 	w.nfq = nfq
 
 	return nil
 }
 
+func (w *Worker) hookFn(a nfqueue.Attribute) int {
+	w.logger.Infof("packet received")
+
+	// accept empty payload
+	if a.Payload == nil {
+		w.logger.Infof("empty payload - accept")
+
+		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+		return 0
+	}
+
+	// WARNING:
+	// 1. DON'T MODIFY THE PACKET (NoCopy: true)
+	// 2. NOT THREAD SAFE (Lazy: true)
+	packet := gopacket.NewPacket(*a.Payload, layers.LayerTypeIPv4, gopacket.DecodeOptions{NoCopy: true, Lazy: true})
+	if err := packet.ErrorLayer(); err != nil {
+		w.logger.Infof("error occured: %s - accept", err.Error())
+
+		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+		return 0
+	}
+
+	// pass through filters
+	for i, filter := range w.filters {
+		if !filter.Check(packet) {
+			w.logger.Infof("%d: filter: check failed - block", i)
+
+			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
+			return 0
+		}
+	}
+
+	return nfqueue.NfAccept
+}
+
+func (w *Worker) errFn(e error) int {
+	w.logger.Infof("error received: %s - accept", e.Error())
+
+	return nfqueue.NfAccept
+}
+
 func (w *Worker) Close() error {
-	return w.nfq.Close()
+	if w.nfq != nil {
+		return w.nfq.Close()
+	}
+
+	return nil
 }

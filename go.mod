@@ -1,10 +1,11 @@
 module github.com/cnaize/meds
 
-go 1.24
+go 1.25
 
 require (
 	github.com/appleboy/graceful v1.2.1
 	github.com/florianl/go-nfqueue v1.3.2
+	github.com/gaissmai/bart v0.25.0
 	github.com/google/gopacket v1.1.19
 )
 

@@ -17,6 +17,7 @@ type Queue struct {
 
 func NewQueue(qcount uint, filters []Filter, logger graceful.Logger) *Queue {
 	workers := make([]*Worker, 0, qcount)
+	// WARNING: always balancing from 0 to qcount
 	for qnum := 0; qnum < int(qcount); qnum++ {
 		workers = append(workers, NewWorker(uint16(qnum), filters, logger))
 	}
@@ -35,14 +36,12 @@ func (q *Queue) Run(ctx context.Context) error {
 	for _, worker := range q.workers {
 		if err := worker.Run(ctx); err != nil {
 			return fmt.Errorf("%d: worker run: %w", worker.qnum, err)
-
 		}
 	}
 
 	// up iptables
 	if err := q.ipTablesUp(); err != nil {
 		return fmt.Errorf("iptables up: %w", err)
-
 	}
 
 	// wait till the end

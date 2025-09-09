@@ -2,6 +2,8 @@ github.com/appleboy/graceful v1.2.1 h1:OCNfj5QdQQ82eBuxEF7RAILQCGG+Ued7BOMQwcTv9
 github.com/appleboy/graceful v1.2.1/go.mod h1:XlEg3jkgb42weJeCXch3HRXvWrU5r+EYymCyPVy0EkA=
 github.com/florianl/go-nfqueue v1.3.2 h1:8DPzhKJHywpHJAE/4ktgcqveCL7qmMLsEsVD68C4x4I=
 github.com/florianl/go-nfqueue v1.3.2/go.mod h1:eSnAor2YCfMCVYrVNEhkLGN/r1L+J4uDjc0EUy0tfq4=
+github.com/gaissmai/bart v0.25.0 h1:eqiokVPqM3F94vJ0bTHXHtH91S8zkKL+bKh+BsGOsJM=
+github.com/gaissmai/bart v0.25.0/go.mod h1:GREWQfTLRWz/c5FTOsIw+KkscuFkIV5t8Rp7Nd1Td5c=
 github.com/google/go-cmp v0.5.6/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.7 h1:81/ik6ipDQS2aGcBfIN5dHDB36BwrStyeAQquSYCV4o=
 github.com/google/go-cmp v0.5.7/go.mod h1:n+brtR0CgQNWTVd5ZUFpTBC8YFBDLK/h/bpaJ8/DtOE=
