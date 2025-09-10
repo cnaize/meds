@@ -5,11 +5,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/appleboy/graceful"
+	"github.com/armon/go-radix"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 
@@ -21,7 +22,7 @@ var _ filter.Filter = (*StevenBlack)(nil)
 type StevenBlack struct {
 	urls      []string
 	logger    graceful.Logger
-	blackList atomic.Pointer[sync.Map]
+	blackList atomic.Pointer[radix.Tree]
 }
 
 func NewStevenBlack(urls []string, logger graceful.Logger) *StevenBlack {
@@ -32,7 +33,7 @@ func NewStevenBlack(urls []string, logger graceful.Logger) *StevenBlack {
 }
 
 func (f *StevenBlack) Load(ctx context.Context) error {
-	f.blackList.Store(new(sync.Map))
+	f.blackList.Store(radix.New())
 
 	return nil
 }
@@ -45,9 +46,8 @@ func (f *StevenBlack) Check(packet gopacket.Packet) bool {
 
 	list := f.blackList.Load()
 	for _, question := range dns.Questions {
-		name := strings.ToLower(string(question.Name))
-		if _, found := list.Load(name); found {
-			f.logger.Infof("dns: steven black: found: %s", name)
+		domain := normalizeDomain(string(question.Name))
+		if _, _, found := list.LongestPrefix(domain); found {
 			return false
 		}
 	}
@@ -56,8 +56,7 @@ func (f *StevenBlack) Check(packet gopacket.Packet) bool {
 }
 
 func (f *StevenBlack) Update(ctx context.Context) error {
-	var count int
-	var blackList sync.Map
+	blackList := radix.New()
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -91,13 +90,18 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 				domain = fields[1]
 			}
 
-			blackList.Store(strings.ToLower(domain), struct{}{})
-			count++
+			blackList.Insert(normalizeDomain(domain), struct{}{})
 		}
 	}
 
-	f.logger.Infof("Updated: dns filter: StevenBlack: size: %d", count)
-	f.blackList.Store(&blackList)
+	f.logger.Infof("Updated: dns filter: StevenBlack: size: %d", blackList.Len())
+	f.blackList.Store(blackList)
 
 	return nil
+}
+
+func normalizeDomain(domain string) string {
+	parts := strings.Split(strings.ToLower(domain), ".")
+	slices.Reverse(parts)
+	return strings.Join(parts, ".")
 }
