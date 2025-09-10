@@ -1,4 +1,4 @@
-package filter
+package ip
 
 import (
 	"bufio"
@@ -14,10 +14,10 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 
-	"github.com/cnaize/meds/src/core"
+	"github.com/cnaize/meds/src/core/filter"
 )
 
-var _ core.Filter = (*FireHOL)(nil)
+var _ filter.Filter = (*FireHOL)(nil)
 
 type FireHOL struct {
 	urls      []string
@@ -39,21 +39,21 @@ func NewFireHOL(logger graceful.Logger) *FireHOL {
 func (f *FireHOL) Load(ctx context.Context) error {
 	f.blackList.Store(new(bart.Lite))
 
-	// TODO: FIX ME!
-	return f.Update(ctx)
+	return nil
 }
 
 func (f *FireHOL) Check(packet gopacket.Packet) bool {
-	ip4 := packet.Layer(layers.LayerTypeIPv4)
-	if ip4 == nil {
+	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	if !ok {
+		f.logger.Errorf("ip: fire hol: invalid packet")
 		return true
 	}
-	ip := ip4.(*layers.IPv4)
 
 	list := f.blackList.Load()
-	srcIP := netip.AddrFrom4(*(*[4]byte)(ip.SrcIP.To4()))
-	dstIP := netip.AddrFrom4(*(*[4]byte)(ip.DstIP.To4()))
+	srcIP := netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP.To4()))
+	dstIP := netip.AddrFrom4(*(*[4]byte)(ip4.DstIP.To4()))
 	if list.Contains(srcIP) || list.Contains(dstIP) {
+		f.logger.Infof("ip: fire hol: found: %s -> %s", srcIP.String(), dstIP.String())
 		return false
 	}
 
@@ -92,19 +92,11 @@ func (f *FireHOL) Update(ctx context.Context) error {
 				prefix = netip.PrefixFrom(ip, 32)
 			}
 
-			if prefix.Addr().IsPrivate() ||
-				prefix.Addr().IsLoopback() ||
-				prefix.Addr().IsLinkLocalUnicast() ||
-				prefix.Addr().IsMulticast() ||
-				prefix.Addr().IsUnspecified() {
-				continue
-			}
-
 			blackList.Insert(prefix)
 		}
 	}
 
-	f.logger.Infof("Updated FireHOL: size4: %d, size6: %d", blackList.Size4(), blackList.Size6())
+	f.logger.Infof("Updated: IP: FireHOL: size4: %d, size6: %d", blackList.Size4(), blackList.Size6())
 	f.blackList.Store(blackList)
 
 	return nil
