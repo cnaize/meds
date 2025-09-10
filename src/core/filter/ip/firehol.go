@@ -25,12 +25,9 @@ type FireHOL struct {
 	blackList atomic.Pointer[bart.Lite]
 }
 
-func NewFireHOL(logger graceful.Logger) *FireHOL {
+func NewFireHOL(urls []string, logger graceful.Logger) *FireHOL {
 	return &FireHOL{
-		urls: []string{
-			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
-			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
-		},
+		urls:      urls,
 		logger:    logger,
 		blackList: atomic.Pointer[bart.Lite]{},
 	}
@@ -45,7 +42,6 @@ func (f *FireHOL) Load(ctx context.Context) error {
 func (f *FireHOL) Check(packet gopacket.Packet) bool {
 	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 	if !ok {
-		f.logger.Errorf("ip: fire hol: invalid packet")
 		return true
 	}
 
@@ -53,7 +49,6 @@ func (f *FireHOL) Check(packet gopacket.Packet) bool {
 	srcIP := netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP.To4()))
 	dstIP := netip.AddrFrom4(*(*[4]byte)(ip4.DstIP.To4()))
 	if list.Contains(srcIP) || list.Contains(dstIP) {
-		f.logger.Infof("ip: fire hol: found: %s -> %s", srcIP.String(), dstIP.String())
 		return false
 	}
 
@@ -63,10 +58,16 @@ func (f *FireHOL) Check(packet gopacket.Packet) bool {
 func (f *FireHOL) Update(ctx context.Context) error {
 	blackList := new(bart.Lite)
 	for _, url := range f.urls {
-		// get list
-		resp, err := http.Get(url)
+		// create request
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
-			return fmt.Errorf("%s: get: %w", url, err)
+			return fmt.Errorf("%s: new request: %w", url, err)
+		}
+
+		// do request
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("%s: do request: %w", url, err)
 		}
 		defer resp.Body.Close()
 

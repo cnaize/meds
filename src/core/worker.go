@@ -67,9 +67,8 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// pass through filters
-	for i, filter := range w.filters {
+	for _, filter := range w.filters {
 		if !filter.Check(packet) {
-			w.logger.Infof("%d: filter: check failed -> block", i)
 			return nfqueue.NfDrop
 		}
 	}

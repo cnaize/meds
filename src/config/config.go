@@ -3,6 +3,7 @@ package config
 import "time"
 
 type Config struct {
-	QCount         uint
+	QueueCount     uint
+	UpdateTimeout  time.Duration
 	UpdateInterval time.Duration
 }

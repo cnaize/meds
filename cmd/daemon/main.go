@@ -12,13 +12,16 @@ import (
 	"github.com/cnaize/meds/src/config"
 	"github.com/cnaize/meds/src/core"
 	"github.com/cnaize/meds/src/core/filter"
+
+	dnsfilter "github.com/cnaize/meds/src/core/filter/dns"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
 )
 
 func main() {
 	var cfg config.Config
 	// parse config
-	flag.UintVar(&cfg.QCount, "qcount", uint(runtime.GOMAXPROCS(0)), "set nfqueue count")
+	flag.UintVar(&cfg.QueueCount, "qcount", uint(runtime.GOMAXPROCS(0)), "set nfqueue count")
+	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout per filter")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 24*time.Hour, "update frequency")
 	flag.Parse()
 
@@ -32,15 +35,21 @@ func main() {
 
 	// create filters
 	filters := []filter.Filter{
-		ipfilter.NewFireHOL(logger),
+		ipfilter.NewFireHOL([]string{
+			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
+			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
+		}, logger),
+		dnsfilter.NewStevenBlack([]string{
+			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+		}, logger),
 	}
 
 	// create queue
-	q := core.NewQueue(cfg.QCount, filters, logger)
+	q := core.NewQueue(cfg.QueueCount, filters, logger)
 	if err := q.Load(mainCtx); err != nil {
 		panic(fmt.Sprintf("Failed to load queue: %s", err.Error()))
 	}
-	go q.Update(mainCtx, cfg.UpdateInterval)
+	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
 	// run queue
 	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(logger))

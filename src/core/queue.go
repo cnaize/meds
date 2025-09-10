@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"sync"
 	"time"
 
 	"github.com/appleboy/graceful"
@@ -48,7 +47,6 @@ func (q *Queue) Load(ctx context.Context) error {
 
 			return nil
 		})
-
 	}
 	return group.Wait()
 }
@@ -73,20 +71,22 @@ func (q *Queue) Run(ctx context.Context) error {
 	return nil
 }
 
-func (q *Queue) Update(ctx context.Context, interval time.Duration) {
+func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 	for {
 		q.logger.Infof("Updating queue...")
 
 		// update filters
-		var wg sync.WaitGroup
 		for i, filter := range q.filters {
-			wg.Go(func() {
+			func() {
+				// timeout is per filter
+				ctx, cancel := context.WithTimeout(ctx, timeout)
+				defer cancel()
+
 				if err := filter.Update(ctx); err != nil {
 					q.logger.Errorf("%d: failed to update filter: %s", i, err.Error())
 				}
-			})
+			}()
 		}
-		wg.Wait()
 
 		// sleep
 		time.Sleep(interval)
