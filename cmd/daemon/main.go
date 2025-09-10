@@ -24,6 +24,7 @@ func main() {
 
 	// create logger
 	logger := graceful.NewLogger()
+	logger.Infof("Running Meds...")
 
 	// main context
 	mainCtx, mainCancel := context.WithCancel(context.Background())
@@ -49,8 +50,6 @@ func main() {
 		select {
 		case <-ctx.Done():
 		default:
-			logger.Infof("Running Meds...")
-
 			if err := q.Run(ctx); err != nil {
 				logger.Errorf("run: %+v", err)
 			}

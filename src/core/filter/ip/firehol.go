@@ -96,7 +96,7 @@ func (f *FireHOL) Update(ctx context.Context) error {
 		}
 	}
 
-	f.logger.Infof("Updated: IP: FireHOL: size4: %d, size6: %d", blackList.Size4(), blackList.Size6())
+	f.logger.Infof("Updated: ip filter: FireHOL: size: %d", blackList.Size())
 	f.blackList.Store(blackList)
 
 	return nil

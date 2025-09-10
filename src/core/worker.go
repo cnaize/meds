@@ -54,9 +54,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// accept empty payload
 	if a.Payload == nil {
 		w.logger.Infof("empty payload -> accept")
-
-		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		return 0
+		return nfqueue.NfAccept
 	}
 
 	// WARNING:
@@ -64,19 +62,15 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// 2. NOT THREAD SAFE (Lazy: true)
 	packet := gopacket.NewPacket(*a.Payload, layers.LayerTypeIPv4, gopacket.DecodeOptions{NoCopy: true, Lazy: true})
 	if err := packet.ErrorLayer(); err != nil {
-		w.logger.Infof("error occured: %s -> accept", err.Error())
-
-		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		return 0
+		w.logger.Infof("decode failed: %s -> accept", err.Error())
+		return nfqueue.NfAccept
 	}
 
 	// pass through filters
 	for i, filter := range w.filters {
 		if !filter.Check(packet) {
 			w.logger.Infof("%d: filter: check failed -> block", i)
-
-			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
-			return 0
+			return nfqueue.NfDrop
 		}
 	}
 
@@ -84,8 +78,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 }
 
 func (w *Worker) errFn(e error) int {
-	w.logger.Infof("error received: %s -> accept", e.Error())
-
+	w.logger.Infof("received error: %s", e.Error())
 	return nfqueue.NfAccept
 }
 
