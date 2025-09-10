@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/appleboy/graceful"
 	"github.com/armon/go-radix"
@@ -46,7 +47,7 @@ func (f *StevenBlack) Check(packet gopacket.Packet) bool {
 
 	list := f.blackList.Load()
 	for _, question := range dns.Questions {
-		domain := normalizeDomain(string(question.Name))
+		domain := normalizeDomain(bytesToString(question.Name))
 		if _, _, found := list.LongestPrefix(domain); found {
 			return false
 		}
@@ -104,4 +105,14 @@ func normalizeDomain(domain string) string {
 	parts := strings.Split(strings.ToLower(domain), ".")
 	slices.Reverse(parts)
 	return strings.Join(parts, ".")
+}
+
+func bytesToString(str []byte) string {
+	data := unsafe.SliceData(str)
+	return unsafe.String(data, len(str))
+}
+
+func stringToBytes(str string) []byte {
+	data := unsafe.StringData(str)
+	return unsafe.Slice(data, len(str))
 }
