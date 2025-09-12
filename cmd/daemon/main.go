@@ -15,18 +15,24 @@ import (
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 
-	dnsfilter "github.com/cnaize/meds/src/core/filter/dns"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
 )
 
 func main() {
 	var cfg config.Config
 	// parse config
+	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
 	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 12*time.Hour, "update frequency")
 	flag.Parse()
+
+	// set "debug" for invalid log level
+	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
+	if err != nil {
+		logLevel = zerolog.DebugLevel
+	}
 
 	// create logger
 	logger := logger.NewLogger(get.Ptr(
@@ -35,7 +41,8 @@ func main() {
 		).
 			With().
 			Timestamp().
-			Logger()),
+			Logger().
+			Level(logLevel)),
 	)
 	logger.Run(cfg.LoggersCount)
 
@@ -47,13 +54,9 @@ func main() {
 
 	// create filters
 	filters := []filter.Filter{
-		ipfilter.NewFireHOL([]string{
-			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
-			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
-		}, logger),
-		dnsfilter.NewStevenBlack([]string{
-			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-		}, logger),
+		ipfilter.NewFireHOL([]string{"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset"}, logger),
+		ipfilter.NewSpamhaus([]string{"https://www.spamhaus.org/drop/drop.txt"}, logger),
+		ipfilter.NewAbuse([]string{"https://feodotracker.abuse.ch/downloads/ipblocklist.txt"}, logger),
 	}
 
 	// create queue

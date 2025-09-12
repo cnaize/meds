@@ -13,23 +13,23 @@ import (
 	"github.com/cnaize/meds/src/core/logger"
 )
 
-var _ filter.Filter = (*FireHOL)(nil)
+var _ filter.Filter = (*Spamhaus)(nil)
 
-type FireHOL struct {
+type Spamhaus struct {
 	*Base
 }
 
-func NewFireHOL(urls []string, logger *logger.Logger) *FireHOL {
-	return &FireHOL{
+func NewSpamhaus(urls []string, logger *logger.Logger) *Spamhaus {
+	return &Spamhaus{
 		Base: NewBase(urls, logger),
 	}
 }
 
-func (f *FireHOL) Name() string {
-	return "FireHOL"
+func (f *Spamhaus) Name() string {
+	return "Spamhaus"
 }
 
-func (f *FireHOL) Update(ctx context.Context) error {
+func (f *Spamhaus) Update(ctx context.Context) error {
 	blackList := new(bart.Lite)
 	for _, url := range f.urls {
 		// create request
@@ -49,11 +49,16 @@ func (f *FireHOL) Update(ctx context.Context) error {
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
-			if line == "" || strings.HasPrefix(line, "#") {
+			if line == "" || strings.HasPrefix(line, ";") {
 				continue
 			}
 
-			prefix, ok := ParsePrefix(line)
+			fields := strings.Fields(line)
+			if len(fields) < 1 {
+				continue
+			}
+
+			prefix, ok := ParsePrefix(fields[0])
 			if !ok {
 				continue
 			}

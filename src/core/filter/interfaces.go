@@ -34,10 +34,10 @@ type Updater interface {
 }
 
 type Filter interface {
+	Namer
+	Typer
+
 	Loader
 	Checker
 	Updater
-
-	Namer
-	Typer
 }

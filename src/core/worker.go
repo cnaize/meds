@@ -76,6 +76,15 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 		return 0
 	}
 
+	// accept all dns
+	_, ok := packet.Layer(layers.LayerTypeDNS).(*layers.DNS)
+	if ok {
+		w.logger.Log(event.NewMessage(zerolog.DebugLevel, "dns packet received"))
+
+		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+		return 0
+	}
+
 	// pass through filters
 	for _, filter := range w.filters {
 		if !filter.Check(packet) {

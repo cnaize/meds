@@ -13,23 +13,23 @@ import (
 	"github.com/cnaize/meds/src/core/logger"
 )
 
-var _ filter.Filter = (*FireHOL)(nil)
+var _ filter.Filter = (*Abuse)(nil)
 
-type FireHOL struct {
+type Abuse struct {
 	*Base
 }
 
-func NewFireHOL(urls []string, logger *logger.Logger) *FireHOL {
-	return &FireHOL{
+func NewAbuse(urls []string, logger *logger.Logger) *Abuse {
+	return &Abuse{
 		Base: NewBase(urls, logger),
 	}
 }
 
-func (f *FireHOL) Name() string {
-	return "FireHOL"
+func (f *Abuse) Name() string {
+	return "Abuse.ch"
 }
 
-func (f *FireHOL) Update(ctx context.Context) error {
+func (f *Abuse) Update(ctx context.Context) error {
 	blackList := new(bart.Lite)
 	for _, url := range f.urls {
 		// create request
