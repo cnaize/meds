@@ -60,7 +60,9 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// accept empty payload
 	if a.Payload == nil {
 		w.logger.Log(event.NewError(zerolog.WarnLevel, "packet accepted", errors.New("empty payload")))
-		return nfqueue.NfAccept
+
+		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+		return 0
 	}
 
 	// WARNING:
@@ -69,23 +71,29 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	packet := gopacket.NewPacket(*a.Payload, layers.LayerTypeIPv4, gopacket.DecodeOptions{NoCopy: true, Lazy: true})
 	if err := packet.ErrorLayer(); err != nil {
 		w.logger.Log(event.NewError(zerolog.WarnLevel, "packet accepted", errors.New("decode failed")))
-		return nfqueue.NfAccept
+
+		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+		return 0
 	}
 
 	// pass through filters
 	for _, filter := range w.filters {
 		if !filter.Check(packet) {
 			w.logger.Log(event.NewPacket(zerolog.InfoLevel, "packet dropped", packet, filter.Name(), filter.Type()))
-			return nfqueue.NfDrop
+
+			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
+			return 0
 		}
 	}
 
-	return nfqueue.NfAccept
+	// accept by default
+	w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+	return 0
 }
 
 func (w *Worker) errFn(err error) int {
 	w.logger.Log(event.NewError(zerolog.ErrorLevel, "error skipped", err))
-	return nfqueue.NfAccept
+	return 0
 }
 
 func (w *Worker) Close() error {

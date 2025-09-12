@@ -55,8 +55,7 @@ func (f *FireHOL) Check(packet gopacket.Packet) bool {
 
 	list := f.blackList.Load()
 	srcIP := netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP.To4()))
-	dstIP := netip.AddrFrom4(*(*[4]byte)(ip4.DstIP.To4()))
-	if list.Contains(srcIP) || list.Contains(dstIP) {
+	if list.Contains(srcIP) {
 		return false
 	}
 

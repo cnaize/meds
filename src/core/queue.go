@@ -22,7 +22,7 @@ type Queue struct {
 
 func NewQueue(qcount uint, filters []filter.Filter, logger *logger.Logger) *Queue {
 	workers := make([]*Worker, 0, qcount)
-	// WARNING: always balancing from 0 to qcount
+	// WARNING: always balancing NFQUEUE from 0
 	for qnum := 0; qnum < int(qcount); qnum++ {
 		workers = append(workers, NewWorker(uint16(qnum), filters, logger))
 	}
@@ -116,16 +116,13 @@ func (q *Queue) Close() error {
 }
 
 func (q *Queue) ipTablesUp() error {
-	out, err := exec.Command(
-		"iptables",
-		"-I",
-		"INPUT",
-		"-j",
-		"NFQUEUE",
-		"--queue-balance",
-		fmt.Sprintf("%d:%d", 0, q.qcount), // WARNING: always balancing from 0 to qcount
-		"--queue-bypass").
-		CombinedOutput()
+	cmd := exec.Command("iptables", "-I", "INPUT", "-j", "NFQUEUE", "--queue-bypass")
+	if q.qcount > 1 {
+		// WARNING: always balancing NFQUEUE from 0
+		cmd.Args = append(cmd.Args, "--queue-balance", fmt.Sprintf("%d:%d", 0, q.qcount-1))
+	}
+
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("exec: %s", out)
 	}
@@ -134,16 +131,13 @@ func (q *Queue) ipTablesUp() error {
 }
 
 func (q *Queue) ipTablesDown() error {
-	out, err := exec.Command(
-		"iptables",
-		"-D",
-		"INPUT",
-		"-j",
-		"NFQUEUE",
-		"--queue-balance",
-		fmt.Sprintf("%d:%d", 0, q.qcount), // WARNING: always balancing from 0 to qcount
-		"--queue-bypass").
-		CombinedOutput()
+	cmd := exec.Command("iptables", "-D", "INPUT", "-j", "NFQUEUE", "--queue-bypass")
+	if q.qcount > 1 {
+		// WARNING: always balancing NFQUEUE from 0
+		cmd.Args = append(cmd.Args, "--queue-balance", fmt.Sprintf("%d:%d", 0, q.qcount-1))
+	}
+
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("exec: %s", out)
 	}
