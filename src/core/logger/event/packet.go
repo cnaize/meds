@@ -7,10 +7,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const (
-	DefaultProcessName = "unknown"
-)
-
 var _ Sender = Packet{}
 
 type Packet struct {
@@ -18,8 +14,6 @@ type Packet struct {
 	Packet     gopacket.Packet
 	FilterName string
 	FilterType filter.FilterType
-
-	Process string // async loading
 }
 
 func NewPacket(lvl zerolog.Level, msg string, packet gopacket.Packet, filterName string, filterType filter.FilterType) Packet {
@@ -28,7 +22,6 @@ func NewPacket(lvl zerolog.Level, msg string, packet gopacket.Packet, filterName
 		Packet:     packet,
 		FilterName: filterName,
 		FilterType: filterType,
-		Process:    DefaultProcessName,
 	}
 }
 
@@ -48,6 +41,5 @@ func (e Packet) Send(logger *zerolog.Logger) {
 		Str("type", string(e.FilterType)).
 		Str("src_ip", ip4.SrcIP.String()).
 		Str("dst_ip", ip4.DstIP.String()).
-		Str("process", e.Process).
 		Msg(e.Msg)
 }
