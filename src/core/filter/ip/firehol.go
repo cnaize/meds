@@ -9,28 +9,36 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/appleboy/graceful"
 	"github.com/gaissmai/bart"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 
 	"github.com/cnaize/meds/src/core/filter"
+	"github.com/cnaize/meds/src/core/logger"
 )
 
 var _ filter.Filter = (*FireHOL)(nil)
 
 type FireHOL struct {
 	urls      []string
-	logger    graceful.Logger
+	logger    *logger.Logger
 	blackList atomic.Pointer[bart.Lite]
 }
 
-func NewFireHOL(urls []string, logger graceful.Logger) *FireHOL {
+func NewFireHOL(urls []string, logger *logger.Logger) *FireHOL {
 	return &FireHOL{
 		urls:      urls,
 		logger:    logger,
 		blackList: atomic.Pointer[bart.Lite]{},
 	}
+}
+
+func (f *FireHOL) Name() string {
+	return "FireHOL"
+}
+
+func (f *FireHOL) Type() filter.FilterType {
+	return filter.FilterTypeIP
 }
 
 func (f *FireHOL) Load(ctx context.Context) error {
@@ -97,7 +105,12 @@ func (f *FireHOL) Update(ctx context.Context) error {
 		}
 	}
 
-	f.logger.Infof("Updated: ip filter: FireHOL: size: %d", blackList.Size())
+	f.logger.Logger().
+		Info().
+		Str("name", f.Name()).
+		Str("type", string(f.Type())).
+		Int("size", blackList.Size()).
+		Msg("Filter updated")
 	f.blackList.Store(blackList)
 
 	return nil

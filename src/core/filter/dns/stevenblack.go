@@ -8,29 +8,37 @@ import (
 	"slices"
 	"strings"
 	"sync/atomic"
-	"unsafe"
 
-	"github.com/appleboy/graceful"
 	"github.com/armon/go-radix"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 
+	"github.com/cnaize/meds/lib/util"
 	"github.com/cnaize/meds/src/core/filter"
+	"github.com/cnaize/meds/src/core/logger"
 )
 
 var _ filter.Filter = (*StevenBlack)(nil)
 
 type StevenBlack struct {
 	urls      []string
-	logger    graceful.Logger
+	logger    *logger.Logger
 	blackList atomic.Pointer[radix.Tree]
 }
 
-func NewStevenBlack(urls []string, logger graceful.Logger) *StevenBlack {
+func NewStevenBlack(urls []string, logger *logger.Logger) *StevenBlack {
 	return &StevenBlack{
 		urls:   urls,
 		logger: logger,
 	}
+}
+
+func (f *StevenBlack) Name() string {
+	return "StevenBlack"
+}
+
+func (f *StevenBlack) Type() filter.FilterType {
+	return filter.FilterTypeDNS
 }
 
 func (f *StevenBlack) Load(ctx context.Context) error {
@@ -47,7 +55,7 @@ func (f *StevenBlack) Check(packet gopacket.Packet) bool {
 
 	list := f.blackList.Load()
 	for _, question := range dns.Questions {
-		domain := normalizeDomain(bytesToString(question.Name))
+		domain := normalizeDomain(util.BytesToString(question.Name))
 		if _, _, found := list.LongestPrefix(domain); found {
 			return false
 		}
@@ -95,7 +103,12 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 		}
 	}
 
-	f.logger.Infof("Updated: dns filter: StevenBlack: size: %d", blackList.Len())
+	f.logger.Logger().
+		Info().
+		Str("name", f.Name()).
+		Str("type", string(f.Type())).
+		Int("size", blackList.Len()).
+		Msg("Filter updated")
 	f.blackList.Store(blackList)
 
 	return nil
@@ -105,14 +118,4 @@ func normalizeDomain(domain string) string {
 	parts := strings.Split(strings.ToLower(domain), ".")
 	slices.Reverse(parts)
 	return strings.Join(parts, ".")
-}
-
-func bytesToString(str []byte) string {
-	data := unsafe.SliceData(str)
-	return unsafe.String(data, len(str))
-}
-
-func stringToBytes(str string) []byte {
-	data := unsafe.StringData(str)
-	return unsafe.Slice(data, len(str))
 }

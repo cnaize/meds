@@ -6,6 +6,21 @@ import (
 	"github.com/google/gopacket"
 )
 
+type FilterType string
+
+const (
+	FilterTypeIP  FilterType = "ip"
+	FilterTypeDNS FilterType = "dns"
+)
+
+type Namer interface {
+	Name() string
+}
+
+type Typer interface {
+	Type() FilterType
+}
+
 type Loader interface {
 	Load(ctx context.Context) error
 }
@@ -22,4 +37,7 @@ type Filter interface {
 	Loader
 	Checker
 	Updater
+
+	Namer
+	Typer
 }

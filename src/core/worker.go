@@ -2,25 +2,28 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/appleboy/graceful"
-	"github.com/florianl/go-nfqueue"
+	"github.com/florianl/go-nfqueue/v2"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/rs/zerolog"
 
 	"github.com/cnaize/meds/src/core/filter"
+	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/core/logger/event"
 )
 
 type Worker struct {
 	qnum    uint16
 	filters []filter.Filter
-	logger  graceful.Logger
+	logger  *logger.Logger
 
 	nfq *nfqueue.Nfqueue
 }
 
-func NewWorker(qnum uint16, filters []filter.Filter, logger graceful.Logger) *Worker {
+func NewWorker(qnum uint16, filters []filter.Filter, logger *logger.Logger) *Worker {
 	return &Worker{
 		qnum:    qnum,
 		filters: filters,
@@ -29,7 +32,10 @@ func NewWorker(qnum uint16, filters []filter.Filter, logger graceful.Logger) *Wo
 }
 
 func (w *Worker) Run(ctx context.Context) error {
-	w.logger.Infof("Running worker, qnum: %d...", w.qnum)
+	w.logger.Logger().
+		Info().
+		Uint16("qnum", w.qnum).
+		Msg("Running worker...")
 
 	// open nfqueue
 	nfq, err := nfqueue.Open(&nfqueue.Config{
@@ -53,7 +59,7 @@ func (w *Worker) Run(ctx context.Context) error {
 func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// accept empty payload
 	if a.Payload == nil {
-		w.logger.Infof("empty payload -> accept")
+		w.logger.Log(event.NewError(zerolog.WarnLevel, "packet accepted", errors.New("empty payload")))
 		return nfqueue.NfAccept
 	}
 
@@ -62,13 +68,14 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// 2. NOT THREAD SAFE (Lazy: true)
 	packet := gopacket.NewPacket(*a.Payload, layers.LayerTypeIPv4, gopacket.DecodeOptions{NoCopy: true, Lazy: true})
 	if err := packet.ErrorLayer(); err != nil {
-		w.logger.Infof("decode failed: %s -> accept", err.Error())
+		w.logger.Log(event.NewError(zerolog.WarnLevel, "packet accepted", errors.New("decode failed")))
 		return nfqueue.NfAccept
 	}
 
 	// pass through filters
 	for _, filter := range w.filters {
 		if !filter.Check(packet) {
+			w.logger.Log(event.NewPacket(zerolog.InfoLevel, "packet dropped", packet, filter.Name(), filter.Type()))
 			return nfqueue.NfDrop
 		}
 	}
@@ -76,8 +83,8 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	return nfqueue.NfAccept
 }
 
-func (w *Worker) errFn(e error) int {
-	w.logger.Infof("received error: %s", e.Error())
+func (w *Worker) errFn(err error) int {
+	w.logger.Log(event.NewError(zerolog.ErrorLevel, "error skipped", err))
 	return nfqueue.NfAccept
 }
 

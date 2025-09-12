@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"runtime"
 	"time"
 
 	"github.com/appleboy/graceful"
+	"github.com/rs/zerolog"
 
+	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/config"
 	"github.com/cnaize/meds/src/core"
 	"github.com/cnaize/meds/src/core/filter"
+	"github.com/cnaize/meds/src/core/logger"
 
 	dnsfilter "github.com/cnaize/meds/src/core/filter/dns"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
@@ -20,14 +22,24 @@ import (
 func main() {
 	var cfg config.Config
 	// parse config
-	flag.UintVar(&cfg.QueueCount, "qcount", uint(runtime.GOMAXPROCS(0)), "set nfqueue count")
-	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout per filter")
-	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 24*time.Hour, "update frequency")
+	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
+	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
+	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
+	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 12*time.Hour, "update frequency")
 	flag.Parse()
 
 	// create logger
-	logger := graceful.NewLogger()
-	logger.Infof("Running Meds...")
+	logger := logger.NewLogger(get.Ptr(
+		zerolog.New(
+			zerolog.NewConsoleWriter(),
+		).
+			With().
+			Timestamp().
+			Logger()),
+	)
+	logger.Run(cfg.LoggersCount)
+
+	logger.Logger().Info().Msg("Running Meds...")
 
 	// main context
 	mainCtx, mainCancel := context.WithCancel(context.Background())
@@ -45,14 +57,14 @@ func main() {
 	}
 
 	// create queue
-	q := core.NewQueue(cfg.QueueCount, filters, logger)
+	q := core.NewQueue(cfg.WorkersCount, filters, logger)
 	if err := q.Load(mainCtx); err != nil {
-		panic(fmt.Sprintf("Failed to load queue: %s", err.Error()))
+		logger.Logger().Fatal().Err(err).Msg("queue load failed")
 	}
 	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
 	// run queue
-	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(logger))
+	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(graceful.NewLogger()))
 	m.AddRunningJob(func(ctx context.Context) error {
 		defer mainCancel()
 
@@ -60,7 +72,7 @@ func main() {
 		case <-ctx.Done():
 		default:
 			if err := q.Run(ctx); err != nil {
-				logger.Errorf("run: %+v", err)
+				logger.Logger().Err(err).Msg("queue run failed")
 			}
 		}
 

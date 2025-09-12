@@ -7,20 +7,20 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/appleboy/graceful"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/cnaize/meds/src/core/filter"
+	"github.com/cnaize/meds/src/core/logger"
 )
 
 type Queue struct {
 	qcount  uint
 	filters []filter.Filter
 	workers []*Worker
-	logger  graceful.Logger
+	logger  *logger.Logger
 }
 
-func NewQueue(qcount uint, filters []filter.Filter, logger graceful.Logger) *Queue {
+func NewQueue(qcount uint, filters []filter.Filter, logger *logger.Logger) *Queue {
 	workers := make([]*Worker, 0, qcount)
 	// WARNING: always balancing from 0 to qcount
 	for qnum := 0; qnum < int(qcount); qnum++ {
@@ -36,13 +36,13 @@ func NewQueue(qcount uint, filters []filter.Filter, logger graceful.Logger) *Que
 }
 
 func (q *Queue) Load(ctx context.Context) error {
-	q.logger.Infof("Loading queue...")
+	q.logger.Logger().Info().Msg("Loading queue...")
 
 	group, ctx := errgroup.WithContext(ctx)
-	for i, filter := range q.filters {
+	for _, filter := range q.filters {
 		group.Go(func() error {
 			if err := filter.Load(ctx); err != nil {
-				return fmt.Errorf("%d: load filter: %w", i, err)
+				return fmt.Errorf("%s (%s): filter load: %w", filter.Name(), filter.Type(), err)
 			}
 
 			return nil
@@ -52,7 +52,7 @@ func (q *Queue) Load(ctx context.Context) error {
 }
 
 func (q *Queue) Run(ctx context.Context) error {
-	q.logger.Infof("Running queue...")
+	q.logger.Logger().Info().Msg("Running queue...")
 
 	// create workers
 	for _, worker := range q.workers {
@@ -73,17 +73,22 @@ func (q *Queue) Run(ctx context.Context) error {
 
 func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 	for {
-		q.logger.Infof("Updating queue...")
+		q.logger.Logger().Info().Msg("Updating queue...")
 
 		// update filters
-		for i, filter := range q.filters {
+		for _, filter := range q.filters {
 			func() {
 				// timeout is per filter
 				ctx, cancel := context.WithTimeout(ctx, timeout)
 				defer cancel()
 
 				if err := filter.Update(ctx); err != nil {
-					q.logger.Errorf("%d: failed to update filter: %s", i, err.Error())
+					q.logger.Logger().
+						Error().
+						Err(err).
+						Str("name", filter.Name()).
+						Str("type", string(filter.Type())).
+						Msg("filter update failed")
 				}
 			}()
 		}
