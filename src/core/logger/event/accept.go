@@ -38,7 +38,7 @@ func (e Accept) Send(logger *zerolog.Logger) {
 				Msg(e.Msg)
 
 			// handle metrics
-			packetsAccetCounter.WithLabelValues(src_ip, action, reason)
+			packetsAccetCounter.WithLabelValues(src_ip, action, reason).Inc()
 			packetsTotalCounter.Inc()
 
 			return
@@ -57,6 +57,6 @@ func (e Accept) Send(logger *zerolog.Logger) {
 		Msg(e.Msg)
 
 	// handle metrics
-	packetsAccetCounter.WithLabelValues(src_ip, action, reason)
+	packetsAccetCounter.WithLabelValues(src_ip, action, reason).Inc()
 	packetsTotalCounter.Inc()
 }
