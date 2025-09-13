@@ -24,7 +24,7 @@ func main() {
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
 	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
-	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
+	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", 10*time.Second, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 12*time.Hour, "update frequency")
 	flag.Parse()
 
@@ -46,7 +46,7 @@ func main() {
 	)
 	logger.Run(cfg.LoggersCount)
 
-	logger.Logger().Info().Msg("Running Meds...")
+	logger.Raw().Info().Msg("Running Meds...")
 
 	// main context
 	mainCtx, mainCancel := context.WithCancel(context.Background())
@@ -54,15 +54,22 @@ func main() {
 
 	// create filters
 	filters := []filter.Filter{
-		ipfilter.NewFireHOL([]string{"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset"}, logger),
-		ipfilter.NewSpamhaus([]string{"https://www.spamhaus.org/drop/drop.txt"}, logger),
-		ipfilter.NewAbuse([]string{"https://feodotracker.abuse.ch/downloads/ipblocklist.txt"}, logger),
+		ipfilter.NewFireHOL([]string{
+			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
+			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
+		}, logger),
+		ipfilter.NewSpamhaus([]string{
+			"https://www.spamhaus.org/drop/drop.txt",
+		}, logger),
+		ipfilter.NewAbuse([]string{
+			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+		}, logger),
 	}
 
 	// create queue
 	q := core.NewQueue(cfg.WorkersCount, filters, logger)
 	if err := q.Load(mainCtx); err != nil {
-		logger.Logger().Fatal().Err(err).Msg("queue load failed")
+		logger.Raw().Fatal().Err(err).Msg("queue load failed")
 	}
 	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
@@ -75,7 +82,7 @@ func main() {
 		case <-ctx.Done():
 		default:
 			if err := q.Run(ctx); err != nil {
-				logger.Logger().Err(err).Msg("queue run failed")
+				logger.Raw().Err(err).Msg("queue run failed")
 			}
 		}
 

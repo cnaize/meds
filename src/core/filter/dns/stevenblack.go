@@ -103,7 +103,7 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 		}
 	}
 
-	f.logger.Logger().
+	f.logger.Raw().
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).

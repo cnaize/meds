@@ -32,7 +32,7 @@ func (l *Logger) Log(e event.Sender) {
 	}
 }
 
-func (l *Logger) Logger() *zerolog.Logger {
+func (l *Logger) Raw() *zerolog.Logger {
 	return l.logger
 }
 

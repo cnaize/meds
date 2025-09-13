@@ -36,7 +36,7 @@ func NewQueue(qcount uint, filters []filter.Filter, logger *logger.Logger) *Queu
 }
 
 func (q *Queue) Load(ctx context.Context) error {
-	q.logger.Logger().Info().Msg("Loading queue...")
+	q.logger.Raw().Info().Msg("Loading queue...")
 
 	group, ctx := errgroup.WithContext(ctx)
 	for _, filter := range q.filters {
@@ -52,7 +52,7 @@ func (q *Queue) Load(ctx context.Context) error {
 }
 
 func (q *Queue) Run(ctx context.Context) error {
-	q.logger.Logger().Info().Msg("Running queue...")
+	q.logger.Raw().Info().Msg("Running queue...")
 
 	// create workers
 	for _, worker := range q.workers {
@@ -73,7 +73,7 @@ func (q *Queue) Run(ctx context.Context) error {
 
 func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 	for {
-		q.logger.Logger().Info().Msg("Updating queue...")
+		q.logger.Raw().Info().Msg("Updating queue...")
 
 		// update filters
 		for _, filter := range q.filters {
@@ -83,7 +83,7 @@ func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 				defer cancel()
 
 				if err := filter.Update(ctx); err != nil {
-					q.logger.Logger().
+					q.logger.Raw().
 						Error().
 						Err(err).
 						Str("name", filter.Name()).

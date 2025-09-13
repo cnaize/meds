@@ -4,16 +4,30 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 
 	"github.com/florianl/go-nfqueue/v2"
+	"github.com/gaissmai/bart"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/rs/zerolog"
 
+	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/core/logger/event"
 )
+
+// global whitelist
+var whiteList *bart.Lite
+
+func init() {
+	whiteList = new(bart.Lite)
+	whiteList.Insert(netip.MustParsePrefix("127.0.0.0/8"))
+	whiteList.Insert(netip.MustParsePrefix("10.0.0.0/8"))
+	whiteList.Insert(netip.MustParsePrefix("192.168.0.0/16"))
+	whiteList.Insert(netip.MustParsePrefix("172.16.0.0/12"))
+}
 
 type Worker struct {
 	qnum    uint16
@@ -32,7 +46,7 @@ func NewWorker(qnum uint16, filters []filter.Filter, logger *logger.Logger) *Wor
 }
 
 func (w *Worker) Run(ctx context.Context) error {
-	w.logger.Logger().
+	w.logger.Raw().
 		Info().
 		Uint16("qnum", w.qnum).
 		Msg("Running worker...")
@@ -76,10 +90,10 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 		return 0
 	}
 
-	// accept all dns
-	_, ok := packet.Layer(layers.LayerTypeDNS).(*layers.DNS)
-	if ok {
-		w.logger.Log(event.NewMessage(zerolog.DebugLevel, "dns packet received"))
+	// pass through whitelist
+	srcIP, ok := get.PacketSrcIP(packet)
+	if !ok || whiteList.Contains(srcIP) {
+		w.logger.Log(event.NewMessage(zerolog.DebugLevel, "packet whitelisted"))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0

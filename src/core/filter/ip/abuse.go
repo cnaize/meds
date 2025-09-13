@@ -9,6 +9,7 @@ import (
 
 	"github.com/gaissmai/bart"
 
+	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 )
@@ -53,7 +54,7 @@ func (f *Abuse) Update(ctx context.Context) error {
 				continue
 			}
 
-			prefix, ok := ParsePrefix(line)
+			prefix, ok := get.NetPrefix(line)
 			if !ok {
 				continue
 			}
@@ -62,13 +63,13 @@ func (f *Abuse) Update(ctx context.Context) error {
 		}
 	}
 
-	f.logger.Logger().
+	f.logger.Raw().
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
 		Int("size", blackList.Size()).
 		Msg("Filter updated")
-	f.blackList.Store(blackList)
+	f.blacklist.Store(blackList)
 
 	return nil
 }
