@@ -2,6 +2,8 @@ package get
 
 import (
 	"net/netip"
+	"slices"
+	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -30,4 +32,10 @@ func NetPrefix(str string) (netip.Prefix, bool) {
 	}
 
 	return netip.Prefix{}, false
+}
+
+func ReversedDomain(domain string) string {
+	parts := strings.Split(strings.ToLower(domain), ".")
+	slices.Reverse(parts)
+	return strings.Join(parts, ".")
 }

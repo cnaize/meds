@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"sync/atomic"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/google/gopacket/layers"
 
 	"github.com/cnaize/meds/lib/util"
+	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 )
@@ -55,7 +55,7 @@ func (f *StevenBlack) Check(packet gopacket.Packet) bool {
 
 	list := f.blackList.Load()
 	for _, question := range dns.Questions {
-		domain := normalizeDomain(util.BytesToString(question.Name))
+		domain := get.ReversedDomain(util.BytesToString(question.Name))
 		if _, _, found := list.LongestPrefix(domain); found {
 			return false
 		}
@@ -99,7 +99,7 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 				domain = fields[1]
 			}
 
-			blackList.Insert(normalizeDomain(domain), struct{}{})
+			blackList.Insert(get.ReversedDomain(domain), struct{}{})
 		}
 	}
 
@@ -112,10 +112,4 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 	f.blackList.Store(blackList)
 
 	return nil
-}
-
-func normalizeDomain(domain string) string {
-	parts := strings.Split(strings.ToLower(domain), ".")
-	slices.Reverse(parts)
-	return strings.Join(parts, ".")
 }

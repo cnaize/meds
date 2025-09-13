@@ -14,7 +14,6 @@ import (
 	"github.com/cnaize/meds/src/core"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
-
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
 )
 

@@ -1,10 +1,11 @@
 package event
 
 import (
-	"github.com/cnaize/meds/src/core/filter"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/rs/zerolog"
+
+	"github.com/cnaize/meds/src/core/filter"
 )
 
 var _ Sender = Packet{}
