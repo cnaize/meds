@@ -6,6 +6,8 @@ import (
 
 type Config struct {
 	LogLevel       string
+	MetricsAddr    string
+	EnableMetrics  bool
 	WorkersCount   uint
 	LoggersCount   uint
 	UpdateTimeout  time.Duration

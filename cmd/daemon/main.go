@@ -3,24 +3,28 @@ package main
 import (
 	"context"
 	"flag"
+	"net/http"
 	"runtime"
 	"time"
 
 	"github.com/appleboy/graceful"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 
 	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/config"
 	"github.com/cnaize/meds/src/core"
 	"github.com/cnaize/meds/src/core/filter"
-	"github.com/cnaize/meds/src/core/logger"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
+	"github.com/cnaize/meds/src/core/logger"
 )
 
 func main() {
 	var cfg config.Config
 	// parse config
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
+	flag.StringVar(&cfg.MetricsAddr, "metrics-addr", ":8000", "prometheus metrics address")
+	flag.BoolVar(&cfg.EnableMetrics, "enable-metrics", true, "enable prometheus metrics")
 	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", 10*time.Second, "update timeout (per filter)")
@@ -77,12 +81,21 @@ func main() {
 	m.AddRunningJob(func(ctx context.Context) error {
 		defer mainCancel()
 
-		select {
-		case <-ctx.Done():
-		default:
-			if err := q.Run(ctx); err != nil {
-				logger.Raw().Err(err).Msg("queue run failed")
-			}
+		// run prometheus handler
+		if cfg.EnableMetrics {
+			go func() {
+				mux := http.NewServeMux()
+				mux.Handle("/metrics", promhttp.Handler())
+
+				if err := http.ListenAndServe(cfg.MetricsAddr, mux); err != nil {
+					logger.Raw().Err(err).Msg("metrics run failed")
+				}
+			}()
+		}
+
+		// run main logic
+		if err := q.Run(ctx); err != nil {
+			logger.Raw().Err(err).Msg("queue run failed")
 		}
 
 		return nil
