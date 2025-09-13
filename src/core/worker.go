@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/netip"
 
@@ -23,6 +22,7 @@ var whiteList *bart.Lite
 
 func init() {
 	whiteList = new(bart.Lite)
+	// internal network
 	whiteList.Insert(netip.MustParsePrefix("127.0.0.0/8"))
 	whiteList.Insert(netip.MustParsePrefix("10.0.0.0/8"))
 	whiteList.Insert(netip.MustParsePrefix("192.168.0.0/16"))
@@ -73,7 +73,7 @@ func (w *Worker) Run(ctx context.Context) error {
 func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// accept empty payload
 	if a.Payload == nil {
-		w.logger.Log(event.NewError(zerolog.WarnLevel, "packet accepted", errors.New("empty payload")))
+		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "empty payload", nil))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0
@@ -84,7 +84,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// 2. NOT THREAD SAFE (Lazy: true)
 	packet := gopacket.NewPacket(*a.Payload, layers.LayerTypeIPv4, gopacket.DecodeOptions{NoCopy: true, Lazy: true})
 	if err := packet.ErrorLayer(); err != nil {
-		w.logger.Log(event.NewError(zerolog.WarnLevel, "packet accepted", errors.New("decode failed")))
+		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "decode failed", nil))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0
@@ -93,7 +93,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// pass through whitelist
 	srcIP, ok := get.PacketSrcIP(packet)
 	if !ok || whiteList.Contains(srcIP) {
-		w.logger.Log(event.NewMessage(zerolog.DebugLevel, "packet whitelisted"))
+		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0
@@ -102,7 +102,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// pass through filters
 	for _, filter := range w.filters {
 		if !filter.Check(packet) {
-			w.logger.Log(event.NewPacket(zerolog.InfoLevel, "packet dropped", packet, filter.Name(), filter.Type()))
+			w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", filter.Name(), packet))
 
 			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
 			return 0
@@ -110,6 +110,8 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// accept by default
+	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", packet))
+
 	w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 	return 0
 }

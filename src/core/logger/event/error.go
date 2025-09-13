@@ -8,16 +8,20 @@ var _ Sender = Error{}
 
 type Error struct {
 	Message
-	Error error
+
+	Err error
 }
 
 func NewError(lvl zerolog.Level, msg string, err error) Error {
 	return Error{
 		Message: NewMessage(lvl, msg),
-		Error:   err,
+		Err:     err,
 	}
 }
 
 func (e Error) Send(logger *zerolog.Logger) {
-	logger.WithLevel(e.Lvl).Err(e.Error).Msg(e.Msg)
+	logger.
+		WithLevel(e.Lvl).
+		Err(e.Err).
+		Msg(e.Msg)
 }

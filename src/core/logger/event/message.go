@@ -17,5 +17,7 @@ func NewMessage(lvl zerolog.Level, msg string) Message {
 }
 
 func (e Message) Send(logger *zerolog.Logger) {
-	logger.WithLevel(e.Lvl).Msg(e.Msg)
+	logger.
+		WithLevel(e.Lvl).
+		Msg(e.Msg)
 }
