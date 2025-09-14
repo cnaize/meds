@@ -21,7 +21,7 @@ var (
 			Name:      "packets_accept_count",
 			Help:      "Total number of accepted packets",
 		},
-		[]string{"target", "action", "reason", "filter"},
+		[]string{"action", "reason", "filter"},
 	)
 
 	packetsDropCounter = prometheus.NewCounterVec(
@@ -31,7 +31,7 @@ var (
 			Name:      "packets_drop_count",
 			Help:      "Total number of dropped packets",
 		},
-		[]string{"target", "action", "reason", "filter"},
+		[]string{"action", "reason", "filter"},
 	)
 )
 
