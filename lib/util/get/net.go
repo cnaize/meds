@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+
+	"github.com/cnaize/meds/lib/util"
 )
 
 func PacketSrcIP(packet gopacket.Packet) (netip.Addr, bool) {
@@ -32,6 +34,20 @@ func NetPrefix(str string) (netip.Prefix, bool) {
 	}
 
 	return netip.Prefix{}, false
+}
+
+func DNSQuestions(packet gopacket.Packet) []string {
+	dns, ok := packet.Layer(layers.LayerTypeDNS).(*layers.DNS)
+	if !ok {
+		return nil
+	}
+
+	questions := make([]string, 0, len(dns.Questions))
+	for _, question := range dns.Questions {
+		questions = append(questions, util.BytesToString(question.Name))
+	}
+
+	return questions
 }
 
 func NormalizedDomain(domain string) string {

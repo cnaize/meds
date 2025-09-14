@@ -1,10 +1,13 @@
 package event
 
 import (
+	"strings"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/rs/zerolog"
 
+	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 )
 
@@ -30,41 +33,46 @@ func NewAccept(lvl zerolog.Level, msg, reason string, filter filter.FilterType, 
 func (e Accept) Send(logger *zerolog.Logger) {
 	if e.Packet != nil {
 		if ip4, ok := e.Packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4); ok {
-			src_ip := ip4.SrcIP.String()
+			var target string
+			if e.Filter == filter.FilterTypeDNS {
+				target = strings.Join(get.DNSQuestions(e.Packet), ",")
+			} else {
+				target = ip4.SrcIP.String()
+			}
 			action := string(ActionTypeAccept)
 			reason := e.Reason
 			filter := string(e.Filter)
 			// write message
 			logger.
 				WithLevel(e.Lvl).
-				Str("src_ip", src_ip).
+				Str("target", target).
 				Str("action", action).
 				Str("reason", reason).
 				Str("filter", filter).
 				Msg(e.Msg)
 
 			// handle metrics
-			packetsAccetCounter.WithLabelValues(src_ip, action, reason, filter).Inc()
+			packetsAccetCounter.WithLabelValues(target, action, reason, filter).Inc()
 			packetsTotalCounter.Inc()
 
 			return
 		}
 	}
 
-	src_ip := "empty packet"
+	target := "empty packet"
 	action := string(ActionTypeAccept)
 	reason := e.Reason
 	filter := string(e.Filter)
 	// write message
 	logger.
 		WithLevel(e.Lvl).
-		Str("src_ip", src_ip).
+		Str("target", target).
 		Str("action", action).
 		Str("reason", reason).
 		Str("filter", filter).
 		Msg(e.Msg)
 
 	// handle metrics
-	packetsAccetCounter.WithLabelValues(src_ip, action, reason, filter).Inc()
+	packetsAccetCounter.WithLabelValues(target, action, reason, filter).Inc()
 	packetsTotalCounter.Inc()
 }
