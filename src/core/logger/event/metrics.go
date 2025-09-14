@@ -14,14 +14,14 @@ var (
 		},
 	)
 
-	packetsAccetCounter = prometheus.NewCounterVec(
+	packetsAcceptCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "meds",
 			Subsystem: "core",
 			Name:      "packets_accept_count",
 			Help:      "Total number of accepted packets",
 		},
-		[]string{"action", "reason", "filter"},
+		[]string{"reason", "filter"},
 	)
 
 	packetsDropCounter = prometheus.NewCounterVec(
@@ -31,12 +31,12 @@ var (
 			Name:      "packets_drop_count",
 			Help:      "Total number of dropped packets",
 		},
-		[]string{"action", "reason", "filter"},
+		[]string{"reason", "filter"},
 	)
 )
 
 func init() {
 	prometheus.MustRegister(packetsTotalCounter)
-	prometheus.MustRegister(packetsAccetCounter)
+	prometheus.MustRegister(packetsAcceptCounter)
 	prometheus.MustRegister(packetsDropCounter)
 }

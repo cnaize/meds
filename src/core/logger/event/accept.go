@@ -31,6 +31,12 @@ func NewAccept(lvl zerolog.Level, msg, reason string, filter filter.FilterType, 
 }
 
 func (e Accept) Send(logger *zerolog.Logger) {
+	// handle metrics
+	defer func() {
+		packetsAcceptCounter.WithLabelValues(e.Reason, string(e.Filter)).Inc()
+		packetsTotalCounter.Inc()
+	}()
+
 	if e.Packet != nil {
 		if ip4, ok := e.Packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4); ok {
 			var target string
@@ -39,40 +45,24 @@ func (e Accept) Send(logger *zerolog.Logger) {
 			} else {
 				target = ip4.SrcIP.String()
 			}
-			action := string(ActionTypeAccept)
-			reason := e.Reason
-			filter := string(e.Filter)
-			// write message
+
 			logger.
 				WithLevel(e.Lvl).
 				Str("target", target).
-				Str("action", action).
-				Str("reason", reason).
-				Str("filter", filter).
+				Str("action", string(ActionTypeAccept)).
+				Str("reason", e.Reason).
+				Str("filter", string(e.Filter)).
 				Msg(e.Msg)
-
-			// handle metrics
-			packetsAccetCounter.WithLabelValues(action, reason, filter).Inc()
-			packetsTotalCounter.Inc()
 
 			return
 		}
 	}
 
-	target := "empty packet"
-	action := string(ActionTypeAccept)
-	reason := e.Reason
-	filter := string(e.Filter)
-	// write message
 	logger.
 		WithLevel(e.Lvl).
-		Str("target", target).
-		Str("action", action).
-		Str("reason", reason).
-		Str("filter", filter).
+		Str("target", "empty packet").
+		Str("action", string(ActionTypeAccept)).
+		Str("reason", e.Reason).
+		Str("filter", string(e.Filter)).
 		Msg(e.Msg)
-
-	// handle metrics
-	packetsAccetCounter.WithLabelValues(action, reason, filter).Inc()
-	packetsTotalCounter.Inc()
 }
