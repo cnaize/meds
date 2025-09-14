@@ -34,7 +34,7 @@ func NetPrefix(str string) (netip.Prefix, bool) {
 	return netip.Prefix{}, false
 }
 
-func ReversedDomain(domain string) string {
+func NormalizedDomain(domain string) string {
 	parts := strings.Split(strings.ToLower(domain), ".")
 	slices.Reverse(parts)
 	return strings.Join(parts, ".")

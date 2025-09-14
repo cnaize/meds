@@ -15,8 +15,10 @@ import (
 	"github.com/cnaize/meds/src/config"
 	"github.com/cnaize/meds/src/core"
 	"github.com/cnaize/meds/src/core/filter"
-	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
 	"github.com/cnaize/meds/src/core/logger"
+
+	dnsfilter "github.com/cnaize/meds/src/core/filter/dns"
+	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
 )
 
 func main() {
@@ -57,6 +59,7 @@ func main() {
 
 	// create filters
 	filters := []filter.Filter{
+		// ip filters
 		ipfilter.NewFireHOL([]string{
 			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
 			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
@@ -66,6 +69,10 @@ func main() {
 		}, logger),
 		ipfilter.NewAbuse([]string{
 			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+		}, logger),
+		// dns filters
+		dnsfilter.NewStevenBlack([]string{
+			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
 		}, logger),
 	}
 

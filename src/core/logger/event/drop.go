@@ -4,6 +4,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/rs/zerolog"
+
+	"github.com/cnaize/meds/src/core/filter"
 )
 
 var _ Sender = Drop{}
@@ -12,13 +14,15 @@ type Drop struct {
 	Message
 
 	Reason string
+	Filter filter.FilterType
 	Packet gopacket.Packet
 }
 
-func NewDrop(lvl zerolog.Level, msg, reason string, packet gopacket.Packet) Drop {
+func NewDrop(lvl zerolog.Level, msg, reason string, filter filter.FilterType, packet gopacket.Packet) Drop {
 	return Drop{
 		Message: NewMessage(lvl, msg),
 		Reason:  reason,
+		Filter:  filter,
 		Packet:  packet,
 	}
 }
@@ -29,16 +33,18 @@ func (e Drop) Send(logger *zerolog.Logger) {
 			src_ip := ip4.SrcIP.String()
 			action := string(ActionTypeDrop)
 			reason := e.Reason
+			filter := string(e.Filter)
 			// write message
 			logger.
 				WithLevel(e.Lvl).
 				Str("src_ip", src_ip).
 				Str("action", action).
 				Str("reason", reason).
+				Str("filter", filter).
 				Msg(e.Msg)
 
 			// handle metrics
-			packetsAccetCounter.WithLabelValues(src_ip, action, reason).Inc()
+			packetsAccetCounter.WithLabelValues(src_ip, action, reason, filter).Inc()
 			packetsTotalCounter.Inc()
 
 			return
@@ -48,15 +54,17 @@ func (e Drop) Send(logger *zerolog.Logger) {
 	src_ip := "empty packet"
 	action := string(ActionTypeDrop)
 	reason := e.Reason
+	filter := string(e.Filter)
 	// write message
 	logger.
 		WithLevel(e.Lvl).
-		Str("src_ip", "empty packet").
-		Str("action", string(ActionTypeDrop)).
+		Str("src_ip", src_ip).
+		Str("action", action).
 		Str("reason", e.Reason).
+		Str("filter", filter).
 		Msg(e.Msg)
 
 	// handle metrics
-	packetsAccetCounter.WithLabelValues(src_ip, action, reason).Inc()
+	packetsAccetCounter.WithLabelValues(src_ip, action, reason, filter).Inc()
 	packetsTotalCounter.Inc()
 }

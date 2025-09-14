@@ -31,7 +31,7 @@ func (f *FireHOL) Name() string {
 }
 
 func (f *FireHOL) Update(ctx context.Context) error {
-	blackList := new(bart.Lite)
+	blacklist := new(bart.Lite)
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -59,7 +59,7 @@ func (f *FireHOL) Update(ctx context.Context) error {
 				continue
 			}
 
-			blackList.Insert(prefix)
+			blacklist.Insert(prefix)
 		}
 	}
 
@@ -67,9 +67,9 @@ func (f *FireHOL) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", blackList.Size()).
+		Int("size", blacklist.Size()).
 		Msg("Filter updated")
-	f.blacklist.Store(blackList)
+	f.blacklist.Store(blacklist)
 
 	return nil
 }

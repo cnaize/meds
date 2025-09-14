@@ -73,7 +73,7 @@ func (w *Worker) Run(ctx context.Context) error {
 func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// accept empty payload
 	if a.Payload == nil {
-		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "empty payload", nil))
+		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "empty payload", filter.FilterTypeEmpty, nil))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0
@@ -84,7 +84,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// 2. NOT THREAD SAFE (Lazy: true)
 	packet := gopacket.NewPacket(*a.Payload, layers.LayerTypeIPv4, gopacket.DecodeOptions{NoCopy: true, Lazy: true})
 	if err := packet.ErrorLayer(); err != nil {
-		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "decode failed", nil))
+		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "decode failed", filter.FilterTypeEmpty, nil))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0
@@ -93,7 +93,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// pass through whitelist
 	srcIP, ok := get.PacketSrcIP(packet)
 	if !ok || whiteList.Contains(srcIP) {
-		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", packet))
+		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeIP, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0
@@ -102,7 +102,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// pass through filters
 	for _, filter := range w.filters {
 		if !filter.Check(packet) {
-			w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", filter.Name(), packet))
+			w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", filter.Name(), filter.Type(), packet))
 
 			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
 			return 0
@@ -110,7 +110,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// accept by default
-	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", packet))
+	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", filter.FilterTypeEmpty, packet))
 
 	w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 	return 0

@@ -23,7 +23,7 @@ var _ filter.Filter = (*StevenBlack)(nil)
 type StevenBlack struct {
 	urls      []string
 	logger    *logger.Logger
-	blackList atomic.Pointer[radix.Tree]
+	blacklist atomic.Pointer[radix.Tree]
 }
 
 func NewStevenBlack(urls []string, logger *logger.Logger) *StevenBlack {
@@ -42,7 +42,7 @@ func (f *StevenBlack) Type() filter.FilterType {
 }
 
 func (f *StevenBlack) Load(ctx context.Context) error {
-	f.blackList.Store(radix.New())
+	f.blacklist.Store(radix.New())
 
 	return nil
 }
@@ -53,9 +53,9 @@ func (f *StevenBlack) Check(packet gopacket.Packet) bool {
 		return true
 	}
 
-	list := f.blackList.Load()
+	list := f.blacklist.Load()
 	for _, question := range dns.Questions {
-		domain := get.ReversedDomain(util.BytesToString(question.Name))
+		domain := get.NormalizedDomain(util.BytesToString(question.Name))
 		if _, _, found := list.LongestPrefix(domain); found {
 			return false
 		}
@@ -65,7 +65,7 @@ func (f *StevenBlack) Check(packet gopacket.Packet) bool {
 }
 
 func (f *StevenBlack) Update(ctx context.Context) error {
-	blackList := radix.New()
+	blacklist := radix.New()
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -99,7 +99,7 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 				domain = fields[1]
 			}
 
-			blackList.Insert(get.ReversedDomain(domain), struct{}{})
+			blacklist.Insert(get.NormalizedDomain(domain), struct{}{})
 		}
 	}
 
@@ -107,9 +107,9 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", blackList.Len()).
+		Int("size", blacklist.Len()).
 		Msg("Filter updated")
-	f.blackList.Store(blackList)
+	f.blacklist.Store(blacklist)
 
 	return nil
 }
