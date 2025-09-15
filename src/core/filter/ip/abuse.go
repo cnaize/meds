@@ -27,7 +27,13 @@ func NewAbuse(urls []string, logger *logger.Logger) *Abuse {
 }
 
 func (f *Abuse) Name() string {
-	return "Abuse.ch"
+	return "Abuse"
+}
+
+func (f *Abuse) Load(ctx context.Context) error {
+	defer f.logger.Raw().Info().Str("name", f.Name()).Msg("Filter loaded")
+
+	return f.Base.Load(ctx)
 }
 
 func (f *Abuse) Update(ctx context.Context) error {

@@ -1,6 +1,8 @@
 package logger
 
 import (
+	"context"
+
 	"github.com/rs/zerolog"
 
 	"github.com/cnaize/meds/src/core/logger/event"
@@ -18,9 +20,13 @@ func NewLogger(logger *zerolog.Logger) *Logger {
 	}
 }
 
-func (l *Logger) Run(workers uint) {
+func (l *Logger) Raw() *zerolog.Logger {
+	return l.logger
+}
+
+func (l *Logger) Run(ctx context.Context, workers uint) {
 	for range workers {
-		go l.recvLoop()
+		go l.sendLoop(ctx)
 	}
 }
 
@@ -32,12 +38,13 @@ func (l *Logger) Log(e event.Sender) {
 	}
 }
 
-func (l *Logger) Raw() *zerolog.Logger {
-	return l.logger
-}
-
-func (l *Logger) recvLoop() {
-	for e := range l.events {
-		e.Send(l.logger)
+func (l *Logger) sendLoop(ctx context.Context) {
+	for {
+		select {
+		case e := <-l.events:
+			e.Send(l.logger)
+		case <-ctx.Done():
+			return
+		}
 	}
 }

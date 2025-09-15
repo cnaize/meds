@@ -12,6 +12,7 @@ const (
 	FilterTypeEmpty FilterType = "empty"
 	FilterTypeIP    FilterType = "ip"
 	FilterTypeDNS   FilterType = "dns"
+	FilterTypeRate  FilterType = "rate"
 )
 
 type Namer interface {

@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 )
@@ -37,18 +35,13 @@ func NewQueue(qcount uint, filters []filter.Filter, logger *logger.Logger) *Queu
 
 func (q *Queue) Load(ctx context.Context) error {
 	q.logger.Raw().Info().Msg("Loading queue...")
-
-	group, ctx := errgroup.WithContext(ctx)
 	for _, filter := range q.filters {
-		group.Go(func() error {
-			if err := filter.Load(ctx); err != nil {
-				return fmt.Errorf("%s (%s): filter load: %w", filter.Name(), filter.Type(), err)
-			}
-
-			return nil
-		})
+		if err := filter.Load(ctx); err != nil {
+			return fmt.Errorf("%s (%s): filter load: %w", filter.Name(), filter.Type(), err)
+		}
 	}
-	return group.Wait()
+	
+	return nil
 }
 
 func (q *Queue) Run(ctx context.Context) error {

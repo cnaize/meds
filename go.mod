@@ -8,6 +8,7 @@ require (
 	github.com/florianl/go-nfqueue/v2 v2.0.0
 	github.com/gaissmai/bart v0.25.0
 	github.com/google/gopacket v1.1.19
+	github.com/maypok86/otter/v2 v2.2.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.34.0
 	golang.org/x/sync v0.17.0

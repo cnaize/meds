@@ -14,29 +14,29 @@ import (
 	"github.com/cnaize/meds/src/core/logger"
 )
 
-var _ filter.Filter = (*StevenBlack)(nil)
+var _ filter.Filter = (*SomeoneWhoCares)(nil)
 
-type StevenBlack struct {
+type SomeoneWhoCares struct {
 	*Base
 }
 
-func NewStevenBlack(urls []string, logger *logger.Logger) *StevenBlack {
-	return &StevenBlack{
+func NewSomeoneWhoCares(urls []string, logger *logger.Logger) *SomeoneWhoCares {
+	return &SomeoneWhoCares{
 		Base: NewBase(urls, logger),
 	}
 }
 
-func (f *StevenBlack) Name() string {
-	return "StevenBlack"
+func (f *SomeoneWhoCares) Name() string {
+	return "SomeoneWhoCares"
 }
 
-func (f *StevenBlack) Load(ctx context.Context) error {
+func (f *SomeoneWhoCares) Load(ctx context.Context) error {
 	defer f.logger.Raw().Info().Str("name", f.Name()).Msg("Filter loaded")
 
 	return f.Base.Load(ctx)
 }
 
-func (f *StevenBlack) Update(ctx context.Context) error {
+func (f *SomeoneWhoCares) Update(ctx context.Context) error {
 	blacklist := radix.New()
 	for _, url := range f.urls {
 		// create request

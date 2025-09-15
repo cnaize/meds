@@ -7,9 +7,13 @@ import (
 type Config struct {
 	LogLevel       string
 	MetricsAddr    string
-	EnableMetrics  bool
 	WorkersCount   uint
 	LoggersCount   uint
 	UpdateTimeout  time.Duration
 	UpdateInterval time.Duration
+	// rate limiter
+	LimiterMaxBalance uint
+	LimiterRefillRate uint
+	LimiterCacheSize  uint
+	LimiterBucketTTL  time.Duration
 }

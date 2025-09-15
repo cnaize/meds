@@ -22,7 +22,6 @@ func NewBase(urls []string, logger *logger.Logger) *Base {
 	return &Base{
 		urls:      urls,
 		logger:    logger,
-		blacklist: atomic.Pointer[bart.Lite]{},
 	}
 }
 

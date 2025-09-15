@@ -9,6 +9,7 @@ import (
 
 	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
+	"github.com/cnaize/meds/src/core/metrics"
 )
 
 var _ Sender = Drop{}
@@ -33,17 +34,18 @@ func NewDrop(lvl zerolog.Level, msg, reason string, filter filter.FilterType, pa
 func (e Drop) Send(logger *zerolog.Logger) {
 	// handle metrics
 	defer func() {
-		packetsDropCounter.WithLabelValues(e.Reason, string(e.Filter)).Inc()
-		packetsTotalCounter.Inc()
+		metrics.Get().PacketsDroppedTotal.WithLabelValues(e.Reason, string(e.Filter)).Inc()
+		metrics.Get().PacketsProcessedTotal.Inc()
 	}()
 
 	if e.Packet != nil {
 		if ip4, ok := e.Packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4); ok {
 			var target string
-			if e.Filter == filter.FilterTypeDNS {
-				target = strings.Join(get.DNSQuestions(e.Packet), ",")
-			} else {
+			switch e.Filter {
+			case filter.FilterTypeRate, filter.FilterTypeIP:
 				target = ip4.SrcIP.String()
+			case filter.FilterTypeDNS:
+				target = strings.Join(append(get.DNSQuestions(e.Packet), get.DNSAnswers(e.Packet)...), ",")
 			}
 
 			logger.

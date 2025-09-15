@@ -30,6 +30,12 @@ func (f *Spamhaus) Name() string {
 	return "Spamhaus"
 }
 
+func (f *Spamhaus) Load(ctx context.Context) error {
+	defer f.logger.Raw().Info().Str("name", f.Name()).Msg("Filter loaded")
+
+	return f.Base.Load(ctx)
+}
+
 func (f *Spamhaus) Update(ctx context.Context) error {
 	blacklist := new(bart.Lite)
 	for _, url := range f.urls {
