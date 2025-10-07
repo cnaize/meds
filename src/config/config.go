@@ -6,11 +6,14 @@ import (
 
 type Config struct {
 	LogLevel       string
-	MetricsAddr    string
 	WorkersCount   uint
 	LoggersCount   uint
 	UpdateTimeout  time.Duration
 	UpdateInterval time.Duration
+	// api server
+	Username      string
+	Password      string
+	ApiServerAddr string
 	// rate limiter
 	LimiterMaxBalance uint
 	LimiterRefillRate uint

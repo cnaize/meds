@@ -3,13 +3,10 @@ package main
 import (
 	"context"
 	"flag"
-	"net/http"
 	"runtime"
 	"time"
 
 	"github.com/appleboy/graceful"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 
 	"github.com/cnaize/meds/lib/util/get"
@@ -17,7 +14,7 @@ import (
 	"github.com/cnaize/meds/src/core"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
-	"github.com/cnaize/meds/src/core/metrics"
+	"github.com/cnaize/meds/src/server"
 
 	dnsfilter "github.com/cnaize/meds/src/core/filter/dns"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
@@ -28,7 +25,9 @@ func main() {
 	var cfg config.Config
 	// parse config
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
-	flag.StringVar(&cfg.MetricsAddr, "metrics-addr", ":8000", "prometheus metrics address (empty for disable)")
+	flag.StringVar(&cfg.Username, "username", "admin", "admin username")
+	flag.StringVar(&cfg.Password, "password", "admin", "admin password")
+	flag.StringVar(&cfg.ApiServerAddr, "api-addr", ":8000", "api server address")
 	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", 10*time.Second, "update timeout (per filter)")
@@ -56,8 +55,7 @@ func main() {
 			Timestamp().
 			Logger().
 			Level(logLevel),
-	),
-	)
+	))
 	logger.Run(mainCtx, cfg.LoggersCount)
 
 	logger.Raw().Info().Msg("Running Meds...")
@@ -93,30 +91,23 @@ func main() {
 	}
 	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
-	// run queue
+	// create api server
+	api := server.NewServer(cfg.ApiServerAddr, cfg.Username, cfg.Password)
+
 	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(graceful.NewLogger()))
 	m.AddRunningJob(func(ctx context.Context) error {
 		defer mainCancel()
 
-		// run prometheus metrics
-		if cfg.MetricsAddr != "" {
-			go func() {
-				// register metrics
-				reg := prometheus.NewRegistry()
-				metrics.Get().Register(reg)
+		// run api server
+		go func() {
+			defer mainCancel()
 
-				// register handler
-				mux := http.NewServeMux()
-				mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+			if err := api.Run(ctx); err != nil {
+				logger.Raw().Err(err).Msg("api run failed")
+			}
+		}()
 
-				// run http server
-				if err := http.ListenAndServe(cfg.MetricsAddr, mux); err != nil {
-					logger.Raw().Err(err).Msg("metrics run failed")
-				}
-			}()
-		}
-
-		// run main logic
+		// run queue
 		if err := q.Run(ctx); err != nil {
 			logger.Raw().Err(err).Msg("queue run failed")
 		}
@@ -124,6 +115,11 @@ func main() {
 		return nil
 	})
 	m.AddShutdownJob(func() error {
+		// close api server
+		if err := api.Close(); err != nil {
+			logger.Raw().Err(err).Msg("api close failed")
+		}
+		// close queue
 		if err := q.Close(); err != nil {
 			logger.Raw().Err(err).Msg("queue close failed")
 		}
