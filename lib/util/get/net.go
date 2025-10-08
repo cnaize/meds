@@ -72,7 +72,34 @@ func DNSAnswers(packet gopacket.Packet) []string {
 	return answers
 }
 
-func NormalizedDomain(domain string) string {
+func DNSItems(packet gopacket.Packet) []string {
+	dns, ok := packet.Layer(layers.LayerTypeDNS).(*layers.DNS)
+	if !ok {
+		return nil
+	}
+
+	items := make([]string, 0, len(dns.Questions)+len(dns.Answers))
+	// collect questions
+	for _, question := range dns.Questions {
+		if len(question.Name) < 1 {
+			continue
+		}
+
+		items = append(items, util.BytesToString(question.Name))
+	}
+	// collect answers
+	for _, answer := range dns.Answers {
+		if len(answer.CNAME) < 1 {
+			continue
+		}
+
+		items = append(items, util.BytesToString(answer.CNAME))
+	}
+
+	return items
+}
+
+func ReversedDomain(domain string) string {
 	parts := strings.Split(strings.ToLower(domain), ".")
 	slices.Reverse(parts)
 	return strings.Join(parts, ".")

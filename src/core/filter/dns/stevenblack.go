@@ -71,7 +71,7 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 				domain = fields[1]
 			}
 
-			blacklist.Insert(get.NormalizedDomain(domain), struct{}{})
+			blacklist.Insert(get.ReversedDomain(domain), struct{}{})
 		}
 	}
 

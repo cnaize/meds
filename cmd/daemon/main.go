@@ -27,14 +27,14 @@ func main() {
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
 	flag.StringVar(&cfg.Username, "username", "admin", "admin username")
 	flag.StringVar(&cfg.Password, "password", "admin", "admin password")
-	flag.StringVar(&cfg.ApiServerAddr, "api-addr", ":8000", "api server address")
+	flag.StringVar(&cfg.APIServerAddr, "api-addr", ":8000", "api server address")
 	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", 10*time.Second, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 12*time.Hour, "update frequency")
 	flag.UintVar(&cfg.LimiterMaxBalance, "max-packets-at-once", 2000, "max packets per ip at once")
 	flag.UintVar(&cfg.LimiterRefillRate, "max-packets-per-second", 100, "max packets per ip per second")
-	flag.UintVar(&cfg.LimiterCacheSize, "max-packets-cache-size", 100_000, "max packets per ip cache size")
+	flag.UintVar(&cfg.LimiterCacheSize, "max-packets-cache-size", 10_000, "max packets per ip cache size")
 	flag.DurationVar(&cfg.LimiterBucketTTL, "max-packets-cache-ttl", 3*time.Minute, "max packets per ip cache ttl")
 	flag.Parse()
 
@@ -91,14 +91,14 @@ func main() {
 	}
 	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
-	// create api server
-	api := server.NewServer(cfg.ApiServerAddr, cfg.Username, cfg.Password)
+	// create server
+	api := server.NewServer(cfg.APIServerAddr, cfg.Username, cfg.Password)
 
 	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(graceful.NewLogger()))
 	m.AddRunningJob(func(ctx context.Context) error {
 		defer mainCancel()
 
-		// run api server
+		// run server
 		go func() {
 			defer mainCancel()
 
@@ -115,10 +115,11 @@ func main() {
 		return nil
 	})
 	m.AddShutdownJob(func() error {
-		// close api server
+		// close server
 		if err := api.Close(); err != nil {
 			logger.Raw().Err(err).Msg("api close failed")
 		}
+
 		// close queue
 		if err := q.Close(); err != nil {
 			logger.Raw().Err(err).Msg("queue close failed")

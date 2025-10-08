@@ -13,7 +13,7 @@ type Config struct {
 	// api server
 	Username      string
 	Password      string
-	ApiServerAddr string
+	APIServerAddr string
 	// rate limiter
 	LimiterMaxBalance uint
 	LimiterRefillRate uint

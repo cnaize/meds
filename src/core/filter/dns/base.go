@@ -50,7 +50,7 @@ func (f *Base) Check(packet gopacket.Packet) bool {
 			continue
 		}
 
-		domain := get.NormalizedDomain(util.BytesToString(question.Name))
+		domain := get.ReversedDomain(util.BytesToString(question.Name))
 		if _, _, found := list.LongestPrefix(domain); found {
 			return false
 		}
@@ -62,7 +62,7 @@ func (f *Base) Check(packet gopacket.Packet) bool {
 			continue
 		}
 
-		domain := get.NormalizedDomain(util.BytesToString(answer.CNAME))
+		domain := get.ReversedDomain(util.BytesToString(answer.CNAME))
 		if _, _, found := list.LongestPrefix(domain); found {
 			return false
 		}
