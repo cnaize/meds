@@ -1,4 +1,4 @@
-package list
+package types
 
 import (
 	"sync/atomic"
@@ -7,8 +7,6 @@ import (
 
 	"github.com/cnaize/meds/lib/util/get"
 )
-
-var _ List = (*DomainList)(nil)
 
 // WARNING: lock free, but NOT thread safe
 type DomainList struct {

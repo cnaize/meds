@@ -6,7 +6,6 @@ import (
 	"net/netip"
 
 	"github.com/florianl/go-nfqueue/v2"
-	"github.com/gaissmai/bart"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/rs/zerolog"
@@ -15,33 +14,40 @@ import (
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/core/logger/event"
+	"github.com/cnaize/meds/src/types"
 )
 
-// global whitelist
-var whiteList *bart.Lite
-
-func init() {
-	whiteList = new(bart.Lite)
-	// internal network
-	whiteList.Insert(netip.MustParsePrefix("127.0.0.0/8"))
-	whiteList.Insert(netip.MustParsePrefix("10.0.0.0/8"))
-	whiteList.Insert(netip.MustParsePrefix("192.168.0.0/16"))
-	whiteList.Insert(netip.MustParsePrefix("172.16.0.0/12"))
-}
-
 type Worker struct {
-	qnum    uint16
+	qnum uint16
+
+	sbWhiteList *types.SubnetList
+	sbBlackList *types.SubnetList
+	dmWhiteList *types.DomainList
+	dmBlackList *types.DomainList
+
 	filters []filter.Filter
 	logger  *logger.Logger
 
 	nfq *nfqueue.Nfqueue
 }
 
-func NewWorker(qnum uint16, filters []filter.Filter, logger *logger.Logger) *Worker {
+func NewWorker(
+	qnum uint16,
+	subnetWhiteList *types.SubnetList,
+	subnetBlackList *types.SubnetList,
+	domainWhiteList *types.DomainList,
+	domainBlackList *types.DomainList,
+	filters []filter.Filter,
+	logger *logger.Logger,
+) *Worker {
 	return &Worker{
-		qnum:    qnum,
-		filters: filters,
-		logger:  logger,
+		qnum:        qnum,
+		sbWhiteList: subnetWhiteList,
+		sbBlackList: subnetBlackList,
+		dmWhiteList: domainWhiteList,
+		dmBlackList: domainBlackList,
+		filters:     filters,
+		logger:      logger,
 	}
 }
 
@@ -90,13 +96,48 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 		return 0
 	}
 
-	// pass through whitelist
+	// accept invalid packet
 	srcIP, ok := get.PacketSrcIP(packet)
-	if !ok || whiteList.Contains(srcIP) {
+	if !ok {
+		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet skipped", "invalid packet", filter.FilterTypeIP, packet))
+
+		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+		return 0
+	}
+
+	// pass through subnet lists
+	srcSubnet := netip.PrefixFrom(srcIP, 32)
+	// whitelist
+	if w.sbWhiteList.Lookup(srcSubnet) {
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeIP, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0
+	}
+	// blacklist
+	if w.sbBlackList.Lookup(srcSubnet) {
+		w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", "blacklisted", filter.FilterTypeIP, packet))
+
+		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
+		return 0
+	}
+
+	// pass through domain lists
+	for _, domain := range get.DNSItems(packet) {
+		// whitelist
+		if w.dmWhiteList.Lookup(domain) {
+			w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeDNS, packet))
+
+			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+			return 0
+		}
+		// blacklist
+		if w.dmBlackList.Lookup(domain) {
+			w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", "blacklisted", filter.FilterTypeDNS, packet))
+
+			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
+			return 0
+		}
 	}
 
 	// pass through filters

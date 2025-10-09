@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -31,7 +32,11 @@ func NewServer(addr, username, password string) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	return s.server.ListenAndServe()
+	if err := s.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Server) Close() error {

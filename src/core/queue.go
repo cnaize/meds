@@ -4,32 +4,59 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os/exec"
 	"time"
 
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/types"
 )
 
 type Queue struct {
-	qcount  uint
+	qcount uint
+
+	sbWhiteList *types.SubnetList
+	sbBlackList *types.SubnetList
+	dmWhiteList *types.DomainList
+	dmBlackList *types.DomainList
+
 	filters []filter.Filter
 	workers []*Worker
 	logger  *logger.Logger
 }
 
 func NewQueue(qcount uint, filters []filter.Filter, logger *logger.Logger) *Queue {
+	sbWhiteList := types.NewSubnetList()
+	sbBlackList := types.NewSubnetList()
+	dmWhiteList := types.NewDomainList()
+	dmBlackList := types.NewDomainList()
+
+	// prefill subnet whitelist with internal network
+	sbWhiteList.Upsert(
+		[]netip.Prefix{
+			netip.MustParsePrefix("127.0.0.0/8"),
+			netip.MustParsePrefix("10.0.0.0/8"),
+			netip.MustParsePrefix("192.168.0.0/16"),
+			netip.MustParsePrefix("172.16.0.0/12"),
+		},
+	)
+
 	workers := make([]*Worker, 0, qcount)
 	// WARNING: always balancing NFQUEUE from 0
 	for qnum := 0; qnum < int(qcount); qnum++ {
-		workers = append(workers, NewWorker(uint16(qnum), filters, logger))
+		workers = append(workers, NewWorker(uint16(qnum), sbWhiteList, sbBlackList, dmWhiteList, dmBlackList, filters, logger))
 	}
 
 	return &Queue{
-		qcount:  qcount,
-		filters: filters,
-		workers: workers,
-		logger:  logger,
+		qcount:      qcount,
+		sbWhiteList: sbWhiteList,
+		sbBlackList: sbBlackList,
+		dmWhiteList: dmWhiteList,
+		dmBlackList: dmBlackList,
+		filters:     filters,
+		workers:     workers,
+		logger:      logger,
 	}
 }
 
@@ -40,7 +67,7 @@ func (q *Queue) Load(ctx context.Context) error {
 			return fmt.Errorf("%s (%s): filter load: %w", filter.Name(), filter.Type(), err)
 		}
 	}
-	
+
 	return nil
 }
 
