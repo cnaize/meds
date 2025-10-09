@@ -14,6 +14,7 @@ import (
 	"github.com/cnaize/meds/src/core"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/database"
 	"github.com/cnaize/meds/src/server"
 
 	dnsfilter "github.com/cnaize/meds/src/core/filter/dns"
@@ -25,6 +26,7 @@ func main() {
 	var cfg config.Config
 	// parse config
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
+	flag.StringVar(&cfg.DBFilePath, "db-path", "meds.db", "path to database file")
 	flag.StringVar(&cfg.Username, "username", "admin", "admin username")
 	flag.StringVar(&cfg.Password, "password", "admin", "admin password")
 	flag.StringVar(&cfg.APIServerAddr, "api-addr", ":8000", "api server address")
@@ -59,6 +61,12 @@ func main() {
 	logger.Run(mainCtx, cfg.LoggersCount)
 
 	logger.Raw().Info().Msg("Running Meds...")
+
+	// create database
+	db := database.NewDatabase(cfg.DBFilePath, logger)
+	if err := db.Init(mainCtx); err != nil {
+		logger.Raw().Fatal().Err(err).Msg("database init failed")
+	}
 
 	// create filters
 	filters := []filter.Filter{
@@ -123,6 +131,11 @@ func main() {
 		// close queue
 		if err := q.Close(); err != nil {
 			logger.Raw().Err(err).Msg("queue close failed")
+		}
+
+		// close database
+		if err := db.Close(); err != nil {
+			logger.Raw().Err(err).Msg("database close failed")
 		}
 
 		return nil

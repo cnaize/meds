@@ -17,4 +17,8 @@ func Register(r *gin.Engine) {
 	root.GET("/metrics", gin.WrapH(promhttp.HandlerFor(reg, promhttp.HandlerOpts{})))
 
 	// register api endpoints
+	whitelist := root.Group("/whitelist")
+
+	wlSubnet := whitelist.Group("/subnet")
+	wlSubnet.POST("/upsert", subnetWhitelistUpsert)
 }

@@ -5,9 +5,12 @@ import (
 )
 
 type Config struct {
-	LogLevel       string
-	WorkersCount   uint
-	LoggersCount   uint
+	LogLevel   string
+	DBFilePath string
+	// core
+	WorkersCount uint
+	LoggersCount uint
+	// filter
 	UpdateTimeout  time.Duration
 	UpdateInterval time.Duration
 	// api server

@@ -16,8 +16,8 @@ import (
 type Queue struct {
 	qcount uint
 
-	sbWhiteList *types.SubnetList
-	sbBlackList *types.SubnetList
+	snWhiteList *types.SubnetList
+	snBlackList *types.SubnetList
 	dmWhiteList *types.DomainList
 	dmBlackList *types.DomainList
 
@@ -27,13 +27,13 @@ type Queue struct {
 }
 
 func NewQueue(qcount uint, filters []filter.Filter, logger *logger.Logger) *Queue {
-	sbWhiteList := types.NewSubnetList()
-	sbBlackList := types.NewSubnetList()
+	snWhiteList := types.NewSubnetList()
+	snBlackList := types.NewSubnetList()
 	dmWhiteList := types.NewDomainList()
 	dmBlackList := types.NewDomainList()
 
 	// prefill subnet whitelist with internal network
-	sbWhiteList.Upsert(
+	snWhiteList.Upsert(
 		[]netip.Prefix{
 			netip.MustParsePrefix("127.0.0.0/8"),
 			netip.MustParsePrefix("10.0.0.0/8"),
@@ -45,13 +45,13 @@ func NewQueue(qcount uint, filters []filter.Filter, logger *logger.Logger) *Queu
 	workers := make([]*Worker, 0, qcount)
 	// WARNING: always balancing NFQUEUE from 0
 	for qnum := 0; qnum < int(qcount); qnum++ {
-		workers = append(workers, NewWorker(uint16(qnum), sbWhiteList, sbBlackList, dmWhiteList, dmBlackList, filters, logger))
+		workers = append(workers, NewWorker(uint16(qnum), snWhiteList, snBlackList, dmWhiteList, dmBlackList, filters, logger))
 	}
 
 	return &Queue{
 		qcount:      qcount,
-		sbWhiteList: sbWhiteList,
-		sbBlackList: sbBlackList,
+		snWhiteList: snWhiteList,
+		snBlackList: snBlackList,
 		dmWhiteList: dmWhiteList,
 		dmBlackList: dmBlackList,
 		filters:     filters,

@@ -20,8 +20,8 @@ import (
 type Worker struct {
 	qnum uint16
 
-	sbWhiteList *types.SubnetList
-	sbBlackList *types.SubnetList
+	snWhiteList *types.SubnetList
+	snBlackList *types.SubnetList
 	dmWhiteList *types.DomainList
 	dmBlackList *types.DomainList
 
@@ -42,8 +42,8 @@ func NewWorker(
 ) *Worker {
 	return &Worker{
 		qnum:        qnum,
-		sbWhiteList: subnetWhiteList,
-		sbBlackList: subnetBlackList,
+		snWhiteList: subnetWhiteList,
+		snBlackList: subnetBlackList,
 		dmWhiteList: domainWhiteList,
 		dmBlackList: domainBlackList,
 		filters:     filters,
@@ -108,14 +108,14 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	// pass through subnet lists
 	srcSubnet := netip.PrefixFrom(srcIP, 32)
 	// whitelist
-	if w.sbWhiteList.Lookup(srcSubnet) {
+	if w.snWhiteList.Lookup(srcSubnet) {
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeIP, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		return 0
 	}
 	// blacklist
-	if w.sbBlackList.Lookup(srcSubnet) {
+	if w.snBlackList.Lookup(srcSubnet) {
 		w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", "blacklisted", filter.FilterTypeIP, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
