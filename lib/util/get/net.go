@@ -1,6 +1,7 @@
 package get
 
 import (
+	"fmt"
 	"net/netip"
 	"slices"
 	"strings"
@@ -20,11 +21,7 @@ func PacketSrcIP(packet gopacket.Packet) (netip.Addr, bool) {
 	return netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP.To4())), true
 }
 
-func NetPrefix(str string) (netip.Prefix, bool) {
-	if str == "" {
-		return netip.Prefix{}, false
-	}
-
+func Subnet(str string) (netip.Prefix, bool) {
 	if prefix, err := netip.ParsePrefix(str); err == nil {
 		return prefix, true
 	}
@@ -34,6 +31,19 @@ func NetPrefix(str string) (netip.Prefix, bool) {
 	}
 
 	return netip.Prefix{}, false
+}
+
+func Subnets(strs []string) ([]netip.Prefix, error) {
+	subnets := make([]netip.Prefix, len(strs))
+	for i, str := range strs {
+		subnet, ok := Subnet(str)
+		if !ok {
+			return nil, fmt.Errorf("parse: %s", str)
+		}
+		subnets[i] = subnet
+	}
+
+	return subnets, nil
 }
 
 func DNSQuestions(packet gopacket.Packet) []string {

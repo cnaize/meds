@@ -60,12 +60,12 @@ func (f *FireHOL) Update(ctx context.Context) error {
 				continue
 			}
 
-			prefix, ok := get.NetPrefix(line)
+			subnet, ok := get.Subnet(line)
 			if !ok {
 				continue
 			}
 
-			blacklist.Insert(prefix)
+			blacklist.Insert(subnet)
 		}
 	}
 

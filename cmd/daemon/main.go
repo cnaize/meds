@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
+	"net/netip"
 	"runtime"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/database"
 	"github.com/cnaize/meds/src/server"
+	"github.com/cnaize/meds/src/types"
 
 	dnsfilter "github.com/cnaize/meds/src/core/filter/dns"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
@@ -68,32 +71,17 @@ func main() {
 		logger.Raw().Fatal().Err(err).Msg("database init failed")
 	}
 
-	// create filters
-	filters := []filter.Filter{
-		// rate filters
-		ratefilter.NewLimiter(cfg.LimiterMaxBalance, cfg.LimiterRefillRate, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
-		// ip filters
-		ipfilter.NewFireHOL([]string{
-			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
-			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
-		}, logger),
-		ipfilter.NewSpamhaus([]string{
-			"https://www.spamhaus.org/drop/drop.txt",
-		}, logger),
-		ipfilter.NewAbuse([]string{
-			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
-		}, logger),
-		// dns filters
-		dnsfilter.NewStevenBlack([]string{
-			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-		}, logger),
-		dnsfilter.NewSomeoneWhoCares([]string{
-			"https://someonewhocares.org/hosts/hosts",
-		}, logger),
+	// load white/black lists
+	subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, err := loadWhiteBlackLists(mainCtx, db)
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("white/black lists load")
 	}
 
+	// create filters
+	filters := newFilters(cfg, logger)
+
 	// create queue
-	q := core.NewQueue(cfg.WorkersCount, filters, logger)
+	q := core.NewQueue(cfg.WorkersCount, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, filters, logger)
 	if err := q.Load(mainCtx); err != nil {
 		logger.Raw().Fatal().Err(err).Msg("queue load failed")
 	}
@@ -143,4 +131,94 @@ func main() {
 
 	// wait till the end
 	<-m.Done()
+}
+
+func loadWhiteBlackLists(ctx context.Context, db *database.Database) (*types.SubnetList, *types.SubnetList, *types.DomainList, *types.DomainList, error) {
+	// load subnet whitelist
+	subnetWhiteList := types.NewSubnetList()
+	snWhiteList, err := db.Q.GetAllWhiteListSubnets(ctx, db.DB)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("subnet whitelist get: %w", err)
+	}
+	if len(snWhiteList) > 0 {
+		subnets, err := get.Subnets(snWhiteList)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("subnet whitelist parse: %w", err)
+		}
+		if err := subnetWhiteList.Upsert(subnets); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("subnet whitelist upsert: %w", err)
+		}
+	} else { // prefill subnet whitelist with internal network
+		if err := subnetWhiteList.Upsert(
+			[]netip.Prefix{
+				netip.MustParsePrefix("127.0.0.0/8"),
+				netip.MustParsePrefix("10.0.0.0/8"),
+				netip.MustParsePrefix("192.168.0.0/16"),
+				netip.MustParsePrefix("172.16.0.0/12"),
+			},
+		); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("subnet whitelist prefill: %w", err)
+		}
+	}
+
+	// load subnet blacklist
+	subnetBlackList := types.NewSubnetList()
+	snBlackList, err := db.Q.GetAllBlackListSubnets(ctx, db.DB)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("subnet blacklist get: %w", err)
+	}
+	subnets, err := get.Subnets(snBlackList)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("subnet blacklist parse: %w", err)
+	}
+	if err := subnetBlackList.Upsert(subnets); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("subnet blacklist upsert: %w", err)
+	}
+
+	// load domain whitelist
+	domainWhiteList := types.NewDomainList()
+	dmWhiteList, err := db.Q.GetAllWhiteListDomains(ctx, db.DB)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("domain whitelist get: %w", err)
+	}
+	if err := domainWhiteList.Upsert(dmWhiteList); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("domain whitelist upsert: %w", err)
+	}
+
+	// load domain whitelist
+	domainBlackList := types.NewDomainList()
+	dmBlackList, err := db.Q.GetAllBlackListDomains(ctx, db.DB)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("domain blacklist get: %w", err)
+	}
+	if err := domainBlackList.Upsert(dmBlackList); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("domain blacklist upsert: %w", err)
+	}
+
+	return subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, nil
+}
+
+func newFilters(cfg config.Config, logger *logger.Logger) []filter.Filter {
+	return []filter.Filter{
+		// rate filter
+		ratefilter.NewLimiter(cfg.LimiterMaxBalance, cfg.LimiterRefillRate, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
+		// ip filters
+		ipfilter.NewFireHOL([]string{
+			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
+			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
+		}, logger),
+		ipfilter.NewSpamhaus([]string{
+			"https://www.spamhaus.org/drop/drop.txt",
+		}, logger),
+		ipfilter.NewAbuse([]string{
+			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+		}, logger),
+		// dns filters
+		dnsfilter.NewStevenBlack([]string{
+			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+		}, logger),
+		dnsfilter.NewSomeoneWhoCares([]string{
+			"https://someonewhocares.org/hosts/hosts",
+		}, logger),
+	}
 }

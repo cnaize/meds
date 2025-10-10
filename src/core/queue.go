@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/netip"
 	"os/exec"
 	"time"
 
@@ -15,48 +14,34 @@ import (
 
 type Queue struct {
 	qcount uint
-
-	snWhiteList *types.SubnetList
-	snBlackList *types.SubnetList
-	dmWhiteList *types.DomainList
-	dmBlackList *types.DomainList
+	logger *logger.Logger
 
 	filters []filter.Filter
 	workers []*Worker
-	logger  *logger.Logger
 }
 
-func NewQueue(qcount uint, filters []filter.Filter, logger *logger.Logger) *Queue {
-	snWhiteList := types.NewSubnetList()
-	snBlackList := types.NewSubnetList()
-	dmWhiteList := types.NewDomainList()
-	dmBlackList := types.NewDomainList()
-
-	// prefill subnet whitelist with internal network
-	snWhiteList.Upsert(
-		[]netip.Prefix{
-			netip.MustParsePrefix("127.0.0.0/8"),
-			netip.MustParsePrefix("10.0.0.0/8"),
-			netip.MustParsePrefix("192.168.0.0/16"),
-			netip.MustParsePrefix("172.16.0.0/12"),
-		},
-	)
-
+func NewQueue(
+	qcount uint,
+	subnetWhiteList *types.SubnetList,
+	subnetBlackList *types.SubnetList,
+	domainWhiteList *types.DomainList,
+	domainBlackList *types.DomainList,
+	filters []filter.Filter,
+	logger *logger.Logger,
+) *Queue {
 	workers := make([]*Worker, 0, qcount)
 	// WARNING: always balancing NFQUEUE from 0
 	for qnum := 0; qnum < int(qcount); qnum++ {
-		workers = append(workers, NewWorker(uint16(qnum), snWhiteList, snBlackList, dmWhiteList, dmBlackList, filters, logger))
+		workers = append(workers,
+			NewWorker(uint16(qnum), subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, filters, logger),
+		)
 	}
 
 	return &Queue{
-		qcount:      qcount,
-		snWhiteList: snWhiteList,
-		snBlackList: snBlackList,
-		dmWhiteList: dmWhiteList,
-		dmBlackList: dmBlackList,
-		filters:     filters,
-		workers:     workers,
-		logger:      logger,
+		qcount:  qcount,
+		logger:  logger,
+		filters: filters,
+		workers: workers,
 	}
 }
 

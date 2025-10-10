@@ -65,12 +65,12 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 				continue
 			}
 
-			prefix, ok := get.NetPrefix(fields[0])
+			subnet, ok := get.Subnet(fields[0])
 			if !ok {
 				continue
 			}
 
-			blacklist.Insert(prefix)
+			blacklist.Insert(subnet)
 		}
 	}
 
