@@ -1,3 +1,9 @@
+![Go Version](https://img.shields.io/badge/go-1.24+-00ADD8?logo=go)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Platform](https://img.shields.io/badge/platform-linux-blue)
+![Status](https://img.shields.io/badge/status-alpha-success)
+![Version](https://img.shields.io/badge/version-v0.3.0-blue)
+
 # Meds: net healing
 
 **Meds** is a high-performance firewall system written in Go.  
@@ -20,13 +26,18 @@ The application manages iptables rules automatically.
 
 ```bash
 go build -o meds cmd/daemon/main.go
-sudo ./meds
+sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
 ```
+API available at http://localhost:8000 (Basic Auth: `admin` / `mypass`)
 
 ### Command-line options
 ```text
 ./meds -help
 Usage of ./meds:
+  -api-addr string
+        api server address (default ":8000")
+  -db-path string
+        path to database file (default "meds.db")
   -log-level string
         zerolog level (default "info")
   -loggers-count uint
@@ -34,13 +45,11 @@ Usage of ./meds:
   -max-packets-at-once uint
         max packets per ip at once (default 2000)
   -max-packets-cache-size uint
-        max packets per ip cache size (default 100000)
+        max packets per ip cache size (default 10000)
   -max-packets-cache-ttl duration
         max packets per ip cache ttl (default 3m0s)
   -max-packets-per-second uint
         max packets per ip per second (default 100)
-  -metrics-addr string
-        prometheus metrics address (empty for disable) (default ":8000")
   -update-interval duration
         update frequency (default 12h0m0s)
   -update-timeout duration
@@ -54,9 +63,27 @@ Usage of ./meds:
 By default, metrics are exposed at:
 
 ```bash
-curl http://localhost:8000/metrics
+curl --user admin:mypass http://localhost:8000/v1/metrics
 ```
-You can change the bind address using the `-metrics-addr` flag.
+The metrics endpoint is protected by the same BasicAuth credentials as the API.
+
+### Example API usage
+
+```bash
+# Check IP is in whitelist
+curl -u admin:mypass -X GET http://localhost:8000/v1/whitelist/subnets/200.168.0.1
+
+# Add subnet to whitelist
+curl -u admin:mypass -X POST http://localhost:8000/v1/whitelist/subnets \
+  -d '{"subnets": ["200.168.0.0/16"]}'
+
+# Get all whitelist subnets
+curl -u admin:mypass -X GET http://localhost:8000/v1/whitelist/subnets
+
+# Remove subnet from whitelist
+curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
+  -d '{"subnets": ["200.168.0.0/16"]}'
+```
 
 ---
 
@@ -69,8 +96,8 @@ You can change the bind address using the `-metrics-addr` flag.
   Parses traffic efficiently (`lazy` and `no copy` modes enabled).
 
 - **Lock-free core**  
-  Meds itself does not use any mutexes — all packet filtering, counters, and token buckets are built with atomic operations.  
-  Dependencies like [otter/v2](https://github.com/maypok86/otter) may use fine-grained internal locks, but the Meds processing pipeline remains fully lock-free and highly concurrent.
+  Meds itself does not use any mutexes — all filtering, counters, and rate-limiters use atomic operations.  
+  Dependencies like [otter/v2](https://github.com/maypok86/otter) may internally use fine-grained locks, but they do not affect the lock-free processing pipeline.
 
 - **Blacklist-based filtering**  
   - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)  
@@ -80,11 +107,17 @@ You can change the bind address using the `-metrics-addr` flag.
   Uses token bucket algorithm to limit burst and sustained traffic per source IP.  
   Protects against high-frequency floods (SYN, DNS, ICMP, or generic packet floods).
 
-- **Prometheus integration**  
+- **HTTP API for runtime configuration**  
+  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP or DNS entries in global whitelists/blacklists.  
+  Auth via BasicAuth using `MEDS_USERNAME` / `MEDS_PASSWORD`.
+
+- **Prometheus metrics export**  
   Exposes metrics for observability:
   - Total packets processed
   - Dropped packets (with reasons)
   - Accepted packets (with reasons)
+
+  Metrics are available at `/v1/metrics` via the built-in API server, compatible with Prometheus scrape targets.
  
 - **Asynchronous logging**  
   Uses [zerolog](https://github.com/rs/zerolog) with worker-based async logging for minimal overhead.
@@ -104,10 +137,9 @@ You can change the bind address using the `-metrics-addr` flag.
 
 2. **Classification pipeline**  
    Packets go through multiple filters:
-   - Global whitelist check (local network)
-   - Rate Limiting check per IP (drops packets if token bucket exhausted)
-   - IP blacklist check (source IP)
-   - DNS Questions/Answers check (domains and CNAME chains)
+   - Global IP/DNS whitelist/blacklist check
+   - Rate Limiting per IP — drops packets if the token bucket is exhausted
+   - IP/DNS per filter blacklist check
 
 3. **Decision engine**  
    - **ACCEPT** → packet is safe, passed to kernel stack  
