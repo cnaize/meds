@@ -62,3 +62,43 @@ func (q *Queries) GetAllBlackListSubnets(ctx context.Context, db DBTX) ([]string
 	}
 	return items, nil
 }
+
+const removeBlackListDomain = `-- name: RemoveBlackListDomain :exec
+DELETE FROM dm_blacklist
+WHERE domain = ?1
+`
+
+func (q *Queries) RemoveBlackListDomain(ctx context.Context, db DBTX, domain string) error {
+	_, err := db.ExecContext(ctx, removeBlackListDomain, domain)
+	return err
+}
+
+const removeBlackListSubnet = `-- name: RemoveBlackListSubnet :exec
+DELETE FROM sn_blacklist
+WHERE subnet = ?1
+`
+
+func (q *Queries) RemoveBlackListSubnet(ctx context.Context, db DBTX, subnet string) error {
+	_, err := db.ExecContext(ctx, removeBlackListSubnet, subnet)
+	return err
+}
+
+const upsertBlackListDomain = `-- name: UpsertBlackListDomain :exec
+INSERT INTO dm_blacklist (domain)
+VALUES (?1)
+`
+
+func (q *Queries) UpsertBlackListDomain(ctx context.Context, db DBTX, domain string) error {
+	_, err := db.ExecContext(ctx, upsertBlackListDomain, domain)
+	return err
+}
+
+const upsertBlackListSubnet = `-- name: UpsertBlackListSubnet :exec
+INSERT INTO sn_blacklist (subnet)
+VALUES (?1)
+`
+
+func (q *Queries) UpsertBlackListSubnet(ctx context.Context, db DBTX, subnet string) error {
+	_, err := db.ExecContext(ctx, upsertBlackListSubnet, subnet)
+	return err
+}

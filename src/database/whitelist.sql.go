@@ -63,6 +63,16 @@ func (q *Queries) GetAllWhiteListSubnets(ctx context.Context, db DBTX) ([]string
 	return items, nil
 }
 
+const removeWhiteListDomain = `-- name: RemoveWhiteListDomain :exec
+DELETE FROM dm_whitelist
+WHERE domain = ?1
+`
+
+func (q *Queries) RemoveWhiteListDomain(ctx context.Context, db DBTX, domain string) error {
+	_, err := db.ExecContext(ctx, removeWhiteListDomain, domain)
+	return err
+}
+
 const removeWhiteListSubnet = `-- name: RemoveWhiteListSubnet :exec
 DELETE FROM sn_whitelist
 WHERE subnet = ?1
@@ -70,6 +80,16 @@ WHERE subnet = ?1
 
 func (q *Queries) RemoveWhiteListSubnet(ctx context.Context, db DBTX, subnet string) error {
 	_, err := db.ExecContext(ctx, removeWhiteListSubnet, subnet)
+	return err
+}
+
+const upsertWhiteListDomain = `-- name: UpsertWhiteListDomain :exec
+INSERT INTO dm_whitelist (domain)
+VALUES (?1)
+`
+
+func (q *Queries) UpsertWhiteListDomain(ctx context.Context, db DBTX, domain string) error {
+	_, err := db.ExecContext(ctx, upsertWhiteListDomain, domain)
 	return err
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/netip"
 	"runtime"
 	"time"
 
@@ -193,24 +194,21 @@ func loadWhiteBlackLists(ctx context.Context, db *database.Database) (*types.Sub
 }
 
 func prefillWhiteList(ctx context.Context, db *database.Database, subnetWhiteList *types.SubnetList) error {
-	prefill := []string{
-		"127.0.0.0/8",
-		"10.0.0.0/8",
-		"192.168.0.0/16",
-		"172.16.0.0/12",
+	subnets := []netip.Prefix{
+		netip.MustParsePrefix("127.0.0.0/8"),
+		netip.MustParsePrefix("10.0.0.0/8"),
+		netip.MustParsePrefix("192.168.0.0/16"),
+		netip.MustParsePrefix("172.16.0.0/12"),
 	}
 
-	subnets, err := get.Subnets(prefill)
-	if err != nil {
-		return fmt.Errorf("get subnets: %w", err)
-	}
-
+	// upsert to whitelist
 	if err := subnetWhiteList.Upsert(subnets); err != nil {
 		return fmt.Errorf("upsert subnets: %w", err)
 	}
 
-	for _, subnet := range prefill {
-		if err := db.Q.UpsertWhiteListSubnet(ctx, db.DB, subnet); err != nil {
+	// upsert to database
+	for _, subnet := range subnets {
+		if err := db.Q.UpsertWhiteListSubnet(ctx, db.DB, subnet.String()); err != nil {
 			return fmt.Errorf("upsert subnet: %w", err)
 		}
 	}

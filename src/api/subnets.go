@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,13 +11,13 @@ import (
 	"github.com/cnaize/meds/src/types"
 )
 
-func subnetWhiteListGetAll(whiteList *types.SubnetList) func(*gin.Context) {
+func subnetListGetAll(list *types.SubnetList) func(*gin.Context) {
 	type Out struct {
 		Subnets []string `json:"subnets"`
 	}
 
 	return func(c *gin.Context) {
-		all := whiteList.GetAll()
+		all := list.GetAll()
 		subnets := make([]string, len(all))
 		for i, subnet := range all {
 			subnets[i] = subnet.String()
@@ -26,7 +27,7 @@ func subnetWhiteListGetAll(whiteList *types.SubnetList) func(*gin.Context) {
 	}
 }
 
-func subnetWhiteListLookup(whiteList *types.SubnetList) func(*gin.Context) {
+func subnetListLookup(list *types.SubnetList) func(*gin.Context) {
 	return func(c *gin.Context) {
 		subnet := c.Param("subnet")
 		prefix, ok := get.Subnet(subnet)
@@ -36,12 +37,16 @@ func subnetWhiteListLookup(whiteList *types.SubnetList) func(*gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"found": whiteList.Lookup(prefix),
+			"found": list.Lookup(prefix),
 		})
 	}
 }
 
-func subnetWhiteListUpsert(db *database.Database, whiteList *types.SubnetList) func(*gin.Context) {
+func subnetListUpsert(
+	list *types.SubnetList,
+	db *database.Database,
+	upsertFn func(ctx context.Context, db database.DBTX, subnet string) error,
+) func(*gin.Context) {
 	type In struct {
 		Subnets []string `json:"subnets"`
 	}
@@ -59,13 +64,13 @@ func subnetWhiteListUpsert(db *database.Database, whiteList *types.SubnetList) f
 			return
 		}
 
-		if err := whiteList.Upsert(subnets); err != nil {
+		if err := list.Upsert(subnets); err != nil {
 			c.AbortWithStatus(http.StatusUnprocessableEntity)
 			return
 		}
 
 		for _, subnet := range subnets {
-			if err := db.Q.UpsertWhiteListSubnet(c, db.DB, subnet.String()); err != nil {
+			if err := upsertFn(c, db.DB, subnet.String()); err != nil {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
@@ -75,7 +80,11 @@ func subnetWhiteListUpsert(db *database.Database, whiteList *types.SubnetList) f
 	}
 }
 
-func subnetWhiteListRemove(db *database.Database, whiteList *types.SubnetList) func(*gin.Context) {
+func subnetListRemove(
+	list *types.SubnetList,
+	db *database.Database,
+	removeFn func(ctx context.Context, db database.DBTX, subnet string) error,
+) func(*gin.Context) {
 	type In struct {
 		Subnets []string `json:"subnets"`
 	}
@@ -93,13 +102,13 @@ func subnetWhiteListRemove(db *database.Database, whiteList *types.SubnetList) f
 			return
 		}
 
-		if err := whiteList.Remove(subnets); err != nil {
+		if err := list.Remove(subnets); err != nil {
 			c.AbortWithStatus(http.StatusUnprocessableEntity)
 			return
 		}
 
 		for _, subnet := range subnets {
-			if err := db.Q.RemoveWhiteListSubnet(c, db.DB, subnet.String()); err != nil {
+			if err := removeFn(c, db.DB, subnet.String()); err != nil {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}

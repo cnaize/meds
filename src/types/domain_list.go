@@ -20,6 +20,16 @@ func NewDomainList() *DomainList {
 	return &l
 }
 
+func (l *DomainList) GetAll() []string {
+	all := l.list.Load().ToMap()
+	domains := make([]string, 0, len(all))
+	for domain := range all {
+		domains = append(domains, get.ReversedDomain(domain))
+	}
+
+	return domains
+}
+
 func (l *DomainList) Lookup(domain string) bool {
 	domain = get.ReversedDomain(domain)
 	if _, _, found := l.list.Load().LongestPrefix(domain); found {
