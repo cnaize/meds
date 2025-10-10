@@ -62,3 +62,23 @@ func (q *Queries) GetAllWhiteListSubnets(ctx context.Context, db DBTX) ([]string
 	}
 	return items, nil
 }
+
+const removeWhiteListSubnet = `-- name: RemoveWhiteListSubnet :exec
+DELETE FROM sn_whitelist
+WHERE subnet = ?1
+`
+
+func (q *Queries) RemoveWhiteListSubnet(ctx context.Context, db DBTX, subnet string) error {
+	_, err := db.ExecContext(ctx, removeWhiteListSubnet, subnet)
+	return err
+}
+
+const upsertWhiteListSubnet = `-- name: UpsertWhiteListSubnet :exec
+INSERT INTO sn_whitelist (subnet)
+VALUES (?1)
+`
+
+func (q *Queries) UpsertWhiteListSubnet(ctx context.Context, db DBTX, subnet string) error {
+	_, err := db.ExecContext(ctx, upsertWhiteListSubnet, subnet)
+	return err
+}

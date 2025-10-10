@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/netip"
 	"runtime"
 	"time"
 
@@ -88,7 +87,9 @@ func main() {
 	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
 	// create server
-	api := server.NewServer(cfg.APIServerAddr, cfg.Username, cfg.Password)
+	api := server.NewServer(
+		cfg.APIServerAddr, cfg.Username, cfg.Password, db, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList,
+	)
 
 	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(graceful.NewLogger()))
 	m.AddRunningJob(func(ctx context.Context) error {
@@ -148,15 +149,8 @@ func loadWhiteBlackLists(ctx context.Context, db *database.Database) (*types.Sub
 		if err := subnetWhiteList.Upsert(subnets); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("subnet whitelist upsert: %w", err)
 		}
-	} else { // prefill subnet whitelist with internal network
-		if err := subnetWhiteList.Upsert(
-			[]netip.Prefix{
-				netip.MustParsePrefix("127.0.0.0/8"),
-				netip.MustParsePrefix("10.0.0.0/8"),
-				netip.MustParsePrefix("192.168.0.0/16"),
-				netip.MustParsePrefix("172.16.0.0/12"),
-			},
-		); err != nil {
+	} else {
+		if err := prefillWhiteList(ctx, db, subnetWhiteList); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("subnet whitelist prefill: %w", err)
 		}
 	}
@@ -196,6 +190,32 @@ func loadWhiteBlackLists(ctx context.Context, db *database.Database) (*types.Sub
 	}
 
 	return subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, nil
+}
+
+func prefillWhiteList(ctx context.Context, db *database.Database, subnetWhiteList *types.SubnetList) error {
+	prefill := []string{
+		"127.0.0.0/8",
+		"10.0.0.0/8",
+		"192.168.0.0/16",
+		"172.16.0.0/12",
+	}
+
+	subnets, err := get.Subnets(prefill)
+	if err != nil {
+		return fmt.Errorf("get subnets: %w", err)
+	}
+
+	if err := subnetWhiteList.Upsert(subnets); err != nil {
+		return fmt.Errorf("upsert subnets: %w", err)
+	}
+
+	for _, subnet := range prefill {
+		if err := db.Q.UpsertWhiteListSubnet(ctx, db.DB, subnet); err != nil {
+			return fmt.Errorf("upsert subnet: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func newFilters(cfg config.Config, logger *logger.Logger) []filter.Filter {

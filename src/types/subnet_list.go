@@ -19,6 +19,16 @@ func NewSubnetList() *SubnetList {
 	return &l
 }
 
+func (l *SubnetList) GetAll() []netip.Prefix {
+	list := l.list.Load()
+	subnets := make([]netip.Prefix, 0, list.Size4())
+	for subnet := range list.All4() {
+		subnets = append(subnets, subnet)
+	}
+
+	return subnets
+}
+
 func (l *SubnetList) Lookup(subnet netip.Prefix) bool {
 	return l.list.Load().OverlapsPrefix(subnet)
 }

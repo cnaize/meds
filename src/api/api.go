@@ -6,9 +6,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/cnaize/meds/src/core/metrics"
+	"github.com/cnaize/meds/src/database"
+	"github.com/cnaize/meds/src/types"
 )
 
-func Register(r *gin.Engine) {
+func Register(
+	r *gin.Engine,
+	db *database.Database,
+	subnetWhiteList *types.SubnetList,
+	subnetBlackList *types.SubnetList,
+	domainWhiteList *types.DomainList,
+	domainBlackList *types.DomainList,
+) {
 	// register prometheus metrics
 	reg := prometheus.NewRegistry()
 	metrics.Get().Register(reg)
@@ -19,6 +28,9 @@ func Register(r *gin.Engine) {
 	// register api endpoints
 	whitelist := root.Group("/whitelist")
 
-	wlSubnet := whitelist.Group("/subnet")
-	wlSubnet.POST("/upsert", subnetWhitelistUpsert)
+	wlSubnet := whitelist.Group("/subnets")
+	wlSubnet.GET("", subnetWhiteListGetAll(subnetWhiteList))
+	wlSubnet.GET("/:subnet", subnetWhiteListLookup(subnetWhiteList))
+	wlSubnet.POST("", subnetWhiteListUpsert(db, subnetWhiteList))
+	wlSubnet.DELETE("", subnetWhiteListRemove(db, subnetWhiteList))
 }
