@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net/netip"
+	"os"
 	"runtime"
 	"time"
 
@@ -30,8 +31,6 @@ func main() {
 	// parse config
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
 	flag.StringVar(&cfg.DBFilePath, "db-path", "meds.db", "path to database file")
-	flag.StringVar(&cfg.Username, "username", "admin", "admin username")
-	flag.StringVar(&cfg.Password, "password", "admin", "admin password")
 	flag.StringVar(&cfg.APIServerAddr, "api-addr", ":8000", "api server address")
 	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
@@ -41,6 +40,9 @@ func main() {
 	flag.UintVar(&cfg.LimiterRefillRate, "max-packets-per-second", 100, "max packets per ip per second")
 	flag.UintVar(&cfg.LimiterCacheSize, "max-packets-cache-size", 10_000, "max packets per ip cache size")
 	flag.DurationVar(&cfg.LimiterBucketTTL, "max-packets-cache-ttl", 3*time.Minute, "max packets per ip cache ttl")
+	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" env variables
+	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
+	// flag.StringVar(&cfg.Password, "password", "admin", "admin password")
 	flag.Parse()
 
 	// set "debug" for invalid log level
@@ -62,6 +64,13 @@ func main() {
 			Level(logLevel),
 	))
 	logger.Run(mainCtx, cfg.LoggersCount)
+
+	// check username/password
+	cfg.Username = os.Getenv("MEDS_USERNAME")
+	cfg.Password = os.Getenv("MEDS_PASSWORD")
+	if cfg.Username == "" || cfg.Password == "" {
+		logger.Raw().Fatal().Msg(`Please set "MEDS_USERNAME" and "MEDS_PASSWORD" env variables`)
+	}
 
 	logger.Raw().Info().Msg("Running Meds...")
 
