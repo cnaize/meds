@@ -4,6 +4,8 @@
 ![Status](https://img.shields.io/badge/status-alpha-success)
 ![Version](https://img.shields.io/badge/version-v0.3.0-blue)
 
+---
+
 # Meds: net healing
 
 **Meds** is a high-performance firewall system written in Go.  
@@ -131,15 +133,22 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
 ---
 
 ## 🔍 How It Works
+```text
+[Kernel] → [NFQUEUE] → [Meds]
+                     ↳ Whitelist
+                     ↳ Rate Limiter
+                     ↳ Blacklist
+                     ↳ Decision: ACCEPT / DROP
+```
 
 1. **Packet interception**  
    All inbound packets are queued from Netfilter (`iptables` rule with `-j NFQUEUE`).
 
 2. **Classification pipeline**  
    Packets go through multiple filters:
-   - Global IP/DNS whitelist/blacklist check
-   - Rate Limiting per IP — drops packets if the token bucket is exhausted
-   - IP/DNS per filter blacklist check
+   - Global IP/DNS whitelist check  
+   - Rate Limiting per source IP  
+   - IP/DNS blacklist check (global and per-filter)  
 
 3. **Decision engine**  
    - **ACCEPT** → packet is safe, passed to kernel stack  
