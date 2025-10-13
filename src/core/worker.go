@@ -116,8 +116,8 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// pass through domain whitelist
-	domains := get.DNSItems(packet)
-	if slices.ContainsFunc(domains, w.dmWhiteList.Lookup) {
+	dnsDomains := get.DNSDomains(packet)
+	if slices.ContainsFunc(dnsDomains, w.dmWhiteList.Lookup) {
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeDNS, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
@@ -143,7 +143,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// pass through domain blacklist
-	if slices.ContainsFunc(domains, w.dmBlackList.Lookup) {
+	if slices.ContainsFunc(dnsDomains, w.dmBlackList.Lookup) {
 		w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", "blacklisted", filter.FilterTypeDNS, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)

@@ -37,7 +37,7 @@ func (f *Base) Load(ctx context.Context) error {
 
 func (f *Base) Check(packet gopacket.Packet) bool {
 	list := f.blacklist.Load()
-	for _, domain := range get.DNSItems(packet) {
+	for _, domain := range get.DNSDomains(packet) {
 		domain = get.ReversedDomain(domain)
 		if _, _, found := list.LongestPrefix(domain); found {
 			return false
