@@ -7,7 +7,6 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-// WARNING: lock free, but NOT thread safe
 type SubnetList struct {
 	list atomic.Pointer[bart.Lite]
 }

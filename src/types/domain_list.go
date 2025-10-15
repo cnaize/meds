@@ -8,7 +8,6 @@ import (
 	"github.com/cnaize/meds/lib/util/get"
 )
 
-// WARNING: lock free, but NOT thread safe
 type DomainList struct {
 	list atomic.Pointer[radix.Tree]
 }

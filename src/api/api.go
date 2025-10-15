@@ -1,6 +1,8 @@
 package api
 
 import (
+	"sync"
+
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -8,6 +10,14 @@ import (
 	"github.com/cnaize/meds/src/core/metrics"
 	"github.com/cnaize/meds/src/database"
 	"github.com/cnaize/meds/src/types"
+)
+
+// TODO: move out of global
+var (
+	subnetWhiteListMu sync.Mutex
+	subnetBlackListMu sync.Mutex
+	domainWhiteListMu sync.Mutex
+	domainBlackListMu sync.Mutex
 )
 
 func Register(
@@ -30,29 +40,29 @@ func Register(
 	whitelist := root.Group("/whitelist")
 	// register subnet whitelist
 	snWhiteList := whitelist.Group("/subnets")
-	snWhiteList.GET("", subnetListGetAll(subnetWhiteList))
-	snWhiteList.GET("/:subnet", subnetListLookup(subnetWhiteList))
-	snWhiteList.POST("", subnetListUpsert(subnetWhiteList, db, db.Q.UpsertWhiteListSubnet))
-	snWhiteList.DELETE("", subnetListRemove(subnetWhiteList, db, db.Q.RemoveWhiteListSubnet))
+	snWhiteList.GET("", subnetListGetAll(subnetWhiteList, &subnetWhiteListMu))
+	snWhiteList.GET("/:subnet", subnetListLookup(subnetWhiteList, &subnetWhiteListMu))
+	snWhiteList.POST("", subnetListUpsert(subnetWhiteList, &subnetWhiteListMu, db, db.Q.UpsertWhiteListSubnet))
+	snWhiteList.DELETE("", subnetListRemove(subnetWhiteList, &subnetWhiteListMu, db, db.Q.RemoveWhiteListSubnet))
 	// register domain whitelist
 	dmWhiteList := whitelist.Group("/domains")
-	dmWhiteList.GET("", domainListGetAll(domainWhiteList))
-	dmWhiteList.GET("/:domain", domainListLookup(domainWhiteList))
-	dmWhiteList.POST("", domainListUpsert(domainWhiteList, db, db.Q.UpsertWhiteListDomain))
-	dmWhiteList.DELETE("", domainListRemove(domainWhiteList, db, db.Q.RemoveWhiteListDomain))
+	dmWhiteList.GET("", domainListGetAll(domainWhiteList, &domainWhiteListMu))
+	dmWhiteList.GET("/:domain", domainListLookup(domainWhiteList, &domainWhiteListMu))
+	dmWhiteList.POST("", domainListUpsert(domainWhiteList, &domainWhiteListMu, db, db.Q.UpsertWhiteListDomain))
+	dmWhiteList.DELETE("", domainListRemove(domainWhiteList, &domainWhiteListMu, db, db.Q.RemoveWhiteListDomain))
 
 	// register blacklist api
 	blacklist := root.Group("/blacklist")
 	// register subnet blacklist
 	snBlackList := blacklist.Group("/subnets")
-	snBlackList.GET("", subnetListGetAll(subnetBlackList))
-	snBlackList.GET("/:subnet", subnetListLookup(subnetBlackList))
-	snBlackList.POST("", subnetListUpsert(subnetBlackList, db, db.Q.UpsertBlackListSubnet))
-	snBlackList.DELETE("", subnetListRemove(subnetBlackList, db, db.Q.RemoveBlackListSubnet))
+	snBlackList.GET("", subnetListGetAll(subnetBlackList, &subnetBlackListMu))
+	snBlackList.GET("/:subnet", subnetListLookup(subnetBlackList, &subnetBlackListMu))
+	snBlackList.POST("", subnetListUpsert(subnetBlackList, &subnetBlackListMu, db, db.Q.UpsertBlackListSubnet))
+	snBlackList.DELETE("", subnetListRemove(subnetBlackList, &subnetBlackListMu, db, db.Q.RemoveBlackListSubnet))
 	// register domain blacklist
 	dmBlackList := blacklist.Group("/domains")
-	dmBlackList.GET("", domainListGetAll(domainBlackList))
-	dmBlackList.GET("/:domain", domainListLookup(domainBlackList))
-	dmBlackList.POST("", domainListUpsert(domainBlackList, db, db.Q.UpsertBlackListDomain))
-	dmBlackList.DELETE("", domainListRemove(domainBlackList, db, db.Q.RemoveBlackListDomain))
+	dmBlackList.GET("", domainListGetAll(domainBlackList, &domainBlackListMu))
+	dmBlackList.GET("/:domain", domainListLookup(domainBlackList, &domainBlackListMu))
+	dmBlackList.POST("", domainListUpsert(domainBlackList, &domainBlackListMu, db, db.Q.UpsertBlackListDomain))
+	dmBlackList.DELETE("", domainListRemove(domainBlackList, &domainBlackListMu, db, db.Q.RemoveBlackListDomain))
 }

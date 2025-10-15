@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,12 +12,15 @@ import (
 	"github.com/cnaize/meds/src/types"
 )
 
-func subnetListGetAll(list *types.SubnetList) func(*gin.Context) {
+func subnetListGetAll(list *types.SubnetList, mu *sync.Mutex) func(*gin.Context) {
 	type Out struct {
 		Subnets []string `json:"subnets"`
 	}
 
 	return func(c *gin.Context) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		all := list.GetAll()
 		subnets := make([]string, len(all))
 		for i, subnet := range all {
@@ -27,7 +31,7 @@ func subnetListGetAll(list *types.SubnetList) func(*gin.Context) {
 	}
 }
 
-func subnetListLookup(list *types.SubnetList) func(*gin.Context) {
+func subnetListLookup(list *types.SubnetList, mu *sync.Mutex) func(*gin.Context) {
 	return func(c *gin.Context) {
 		subnet := c.Param("subnet")
 		prefix, ok := get.Subnet(subnet)
@@ -35,6 +39,9 @@ func subnetListLookup(list *types.SubnetList) func(*gin.Context) {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
+
+		mu.Lock()
+		defer mu.Unlock()
 
 		c.JSON(http.StatusOK, gin.H{
 			"found": list.Lookup(prefix),
@@ -44,6 +51,7 @@ func subnetListLookup(list *types.SubnetList) func(*gin.Context) {
 
 func subnetListUpsert(
 	list *types.SubnetList,
+	mu *sync.Mutex,
 	db *database.Database,
 	upsertFn func(ctx context.Context, db database.DBTX, subnet string) error,
 ) func(*gin.Context) {
@@ -64,6 +72,9 @@ func subnetListUpsert(
 			return
 		}
 
+		mu.Lock()
+		defer mu.Unlock()
+
 		if err := list.Upsert(subnets); err != nil {
 			c.AbortWithStatus(http.StatusUnprocessableEntity)
 			return
@@ -82,6 +93,7 @@ func subnetListUpsert(
 
 func subnetListRemove(
 	list *types.SubnetList,
+	mu *sync.Mutex,
 	db *database.Database,
 	removeFn func(ctx context.Context, db database.DBTX, subnet string) error,
 ) func(*gin.Context) {
@@ -101,6 +113,9 @@ func subnetListRemove(
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
+
+		mu.Lock()
+		defer mu.Unlock()
 
 		if err := list.Remove(subnets); err != nil {
 			c.AbortWithStatus(http.StatusUnprocessableEntity)
