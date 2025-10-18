@@ -1,8 +1,8 @@
 ![Go Version](https://img.shields.io/badge/go-1.24+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Status](https://img.shields.io/badge/status-alpha-success)
-![Version](https://img.shields.io/badge/version-v0.3.0-blue)
+![Status](https://img.shields.io/badge/status-beta-success)
+![Version](https://img.shields.io/badge/version-v0.3.1-blue)
 
 ---
 
@@ -65,11 +65,11 @@ Usage of ./meds:
 By default, metrics are exposed at:
 
 ```bash
-curl --user admin:mypass http://localhost:8000/v1/metrics
+curl -u admin:mypass http://localhost:8000/v1/metrics
 ```
 The metrics endpoint is protected by the same BasicAuth credentials as the API.
 
-### Example API usage
+### Example API usage (see [api.go](./src/api/api.go))
 
 ```bash
 # Check IP is in whitelist
@@ -99,7 +99,6 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
 
 - **Lock-free core**  
   Meds itself does not use any mutexes — all filtering, counters, and rate-limiters use atomic operations.  
-  Dependencies like [otter/v2](https://github.com/maypok86/otter) may internally use fine-grained locks, but they do not affect the lock-free processing pipeline.
 
 - **Blacklist-based filtering**  
   - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)  
@@ -148,7 +147,7 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
    Packets go through multiple filters:
    - Global IP/DNS whitelist check  
    - Rate Limiting per source IP  
-   - IP/DNS blacklist check (global and per-filter)  
+   - IP/DNS blacklist check (per-filter and global)  
 
 3. **Decision engine**  
    - **ACCEPT** → packet is safe, passed to kernel stack  
