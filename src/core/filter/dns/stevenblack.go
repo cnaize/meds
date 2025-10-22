@@ -55,7 +55,7 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
-			if line == "" || strings.HasPrefix(line, "#") {
+			if len(line) < 1 || strings.HasPrefix(line, "#") {
 				continue
 			}
 

@@ -107,8 +107,8 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// pass through subnet whitelist
-	srcSubnet := netip.PrefixFrom(srcIP, 32)
-	if w.snWhiteList.Lookup(srcSubnet) {
+	subnet := netip.PrefixFrom(srcIP, 32)
+	if w.snWhiteList.Lookup(subnet) {
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeIP, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
@@ -116,8 +116,8 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// pass through domain whitelist
-	dnsDomains := get.DNSDomains(packet)
-	if slices.ContainsFunc(dnsDomains, w.dmWhiteList.Lookup) {
+	domains := get.Domains(packet)
+	if slices.ContainsFunc(domains, w.dmWhiteList.Lookup) {
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeDNS, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
@@ -135,7 +135,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// pass through subnet blacklist
-	if w.snBlackList.Lookup(srcSubnet) {
+	if w.snBlackList.Lookup(subnet) {
 		w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", "blacklisted", filter.FilterTypeIP, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
@@ -143,7 +143,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// pass through domain blacklist
-	if slices.ContainsFunc(dnsDomains, w.dmBlackList.Lookup) {
+	if slices.ContainsFunc(domains, w.dmBlackList.Lookup) {
 		w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", "blacklisted", filter.FilterTypeDNS, packet))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)

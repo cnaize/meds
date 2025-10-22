@@ -68,7 +68,7 @@ func main() {
 	// check username/password
 	cfg.Username = os.Getenv("MEDS_USERNAME")
 	cfg.Password = os.Getenv("MEDS_PASSWORD")
-	if cfg.Username == "" || cfg.Password == "" {
+	if len(cfg.Username) < 1 || len(cfg.Password) < 1 {
 		logger.Raw().Fatal().Msg(`Please set "MEDS_USERNAME" and "MEDS_PASSWORD" env variables`)
 	}
 

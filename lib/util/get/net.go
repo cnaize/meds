@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"darvaza.org/x/tls/sni"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 
@@ -104,6 +105,33 @@ func DNSDomains(packet gopacket.Packet) []string {
 		}
 
 		domains = append(domains, util.BytesToString(answer.CNAME))
+	}
+
+	return domains
+}
+
+func SNI(packet gopacket.Packet) (string, bool) {
+	tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
+	if !ok {
+		return "", false
+	}
+
+	info := sni.GetInfo(tcp.LayerPayload())
+	if info == nil {
+		return "", false
+	}
+
+	if len(info.ServerName) < 1 {
+		return "", false
+	}
+
+	return info.ServerName, true
+}
+
+func Domains(packet gopacket.Packet) []string {
+	domains := DNSDomains(packet)
+	if sni, ok := SNI(packet); ok {
+		domains = append(domains, sni)
 	}
 
 	return domains
