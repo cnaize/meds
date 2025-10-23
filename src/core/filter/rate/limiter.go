@@ -57,7 +57,7 @@ func (f *Limiter) Load(ctx context.Context) error {
 		return fmt.Errorf("new cache: %w", err)
 	}
 
-	f.logger.Raw().Info().Str("name", f.Name()).Msg("Filter loaded")
+	f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
 	f.cache = cache
 
 	return nil

@@ -31,7 +31,7 @@ func (f *Abuse) Name() string {
 }
 
 func (f *Abuse) Load(ctx context.Context) error {
-	defer f.logger.Raw().Info().Str("name", f.Name()).Msg("Filter loaded")
+	defer f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
 
 	return f.Base.Load(ctx)
 }

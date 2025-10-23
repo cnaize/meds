@@ -11,6 +11,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/gopacket v1.1.19
 	github.com/maypok86/otter/v2 v2.2.1
+	github.com/open-ch/ja3 v1.0.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.34.0
 	modernc.org/sqlite v1.39.1
@@ -60,7 +61,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/exp v0.0.0-20251017212417-90e834f514db // indirect
+	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/net v0.46.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect

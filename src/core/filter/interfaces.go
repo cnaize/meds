@@ -9,10 +9,11 @@ import (
 type FilterType string
 
 const (
-	FilterTypeEmpty FilterType = "empty"
-	FilterTypeIP    FilterType = "ip"
-	FilterTypeDNS   FilterType = "dns"
-	FilterTypeRate  FilterType = "rate"
+	FilterTypeEmpty  FilterType = "empty"
+	FilterTypeIP     FilterType = "ip"
+	FilterTypeJA3    FilterType = "ja3"
+	FilterTypeRate   FilterType = "rate"
+	FilterTypeDomain FilterType = "domain"
 )
 
 type Namer interface {

@@ -1,10 +1,9 @@
-package dns
+package ja3
 
 import (
 	"context"
 	"sync/atomic"
 
-	"github.com/armon/go-radix"
 	"github.com/google/gopacket"
 
 	"github.com/cnaize/meds/lib/util/get"
@@ -15,7 +14,7 @@ import (
 type Base struct {
 	urls      []string
 	logger    *logger.Logger
-	blacklist atomic.Pointer[radix.Tree]
+	blacklist atomic.Pointer[map[string]bool]
 }
 
 func NewBase(urls []string, logger *logger.Logger) *Base {
@@ -26,23 +25,21 @@ func NewBase(urls []string, logger *logger.Logger) *Base {
 }
 
 func (f *Base) Type() filter.FilterType {
-	return filter.FilterTypeDNS
+	return filter.FilterTypeJA3
 }
 
 func (f *Base) Load(ctx context.Context) error {
-	f.blacklist.Store(radix.New())
+	f.blacklist.Store(new(map[string]bool))
 
 	return nil
 }
 
 func (f *Base) Check(packet gopacket.Packet) bool {
-	list := f.blacklist.Load()
-	for _, domain := range get.Domains(packet) {
-		domain = get.ReversedDomain(domain)
-		if _, _, found := list.LongestPrefix(domain); found {
-			return false
-		}
+	hash, ok := get.JA3(packet)
+	if !ok {
+		return true
 	}
 
-	return true
+	list := f.blacklist.Load()
+	return !(*list)[hash]
 }

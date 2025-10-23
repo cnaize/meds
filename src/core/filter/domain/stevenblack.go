@@ -1,4 +1,4 @@
-package ip
+package domain
 
 import (
 	"bufio"
@@ -7,37 +7,37 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gaissmai/bart"
+	"github.com/armon/go-radix"
 
 	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 )
 
-var _ filter.Filter = (*Spamhaus)(nil)
+var _ filter.Filter = (*StevenBlack)(nil)
 
-type Spamhaus struct {
+type StevenBlack struct {
 	*Base
 }
 
-func NewSpamhaus(urls []string, logger *logger.Logger) *Spamhaus {
-	return &Spamhaus{
+func NewStevenBlack(urls []string, logger *logger.Logger) *StevenBlack {
+	return &StevenBlack{
 		Base: NewBase(urls, logger),
 	}
 }
 
-func (f *Spamhaus) Name() string {
-	return "Spamhaus"
+func (f *StevenBlack) Name() string {
+	return "StevenBlack"
 }
 
-func (f *Spamhaus) Load(ctx context.Context) error {
+func (f *StevenBlack) Load(ctx context.Context) error {
 	defer f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
 
 	return f.Base.Load(ctx)
 }
 
-func (f *Spamhaus) Update(ctx context.Context) error {
-	blacklist := new(bart.Lite)
+func (f *StevenBlack) Update(ctx context.Context) error {
+	blacklist := radix.New()
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -52,11 +52,10 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 		}
 		defer resp.Body.Close()
 
-		// scan list
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
-			if len(line) < 1 || strings.HasPrefix(line, ";") {
+			if len(line) < 1 || strings.HasPrefix(line, "#") {
 				continue
 			}
 
@@ -65,12 +64,14 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 				continue
 			}
 
-			subnet, ok := get.Subnet(fields[0])
-			if !ok {
-				continue
+			var domain string
+			if len(fields) < 2 {
+				domain = fields[0]
+			} else {
+				domain = fields[1]
 			}
 
-			blacklist.Insert(subnet)
+			blacklist.Insert(get.ReversedDomain(domain), struct{}{})
 		}
 	}
 
@@ -78,7 +79,7 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", blacklist.Size()).
+		Int("size", blacklist.Len()).
 		Msg("Filter updated")
 	f.blacklist.Store(blacklist)
 

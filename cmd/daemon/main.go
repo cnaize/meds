@@ -21,8 +21,9 @@ import (
 	"github.com/cnaize/meds/src/server"
 	"github.com/cnaize/meds/src/types"
 
-	dnsfilter "github.com/cnaize/meds/src/core/filter/dns"
+	domainfilter "github.com/cnaize/meds/src/core/filter/domain"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
+	ja3filter "github.com/cnaize/meds/src/core/filter/ja3"
 	ratefilter "github.com/cnaize/meds/src/core/filter/rate"
 )
 
@@ -40,7 +41,7 @@ func main() {
 	flag.UintVar(&cfg.LimiterRefillRate, "max-packets-per-second", 100, "max packets per ip per second")
 	flag.UintVar(&cfg.LimiterCacheSize, "max-packets-cache-size", 10_000, "max packets per ip cache size")
 	flag.DurationVar(&cfg.LimiterBucketTTL, "max-packets-cache-ttl", 3*time.Minute, "max packets per ip cache ttl")
-	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" env variables
+	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
 	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
 	// flag.StringVar(&cfg.Password, "password", "admin", "admin password")
 	flag.Parse()
@@ -69,7 +70,7 @@ func main() {
 	cfg.Username = os.Getenv("MEDS_USERNAME")
 	cfg.Password = os.Getenv("MEDS_PASSWORD")
 	if len(cfg.Username) < 1 || len(cfg.Password) < 1 {
-		logger.Raw().Fatal().Msg(`Please set "MEDS_USERNAME" and "MEDS_PASSWORD" env variables`)
+		logger.Raw().Fatal().Msg(`Please set "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables`)
 	}
 
 	logger.Raw().Info().Msg("Running Meds...")
@@ -240,12 +241,16 @@ func newFilters(cfg config.Config, logger *logger.Logger) []filter.Filter {
 		ipfilter.NewAbuse([]string{
 			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
 		}, logger),
-		// dns filters
-		dnsfilter.NewStevenBlack([]string{
+		// domain filters
+		domainfilter.NewStevenBlack([]string{
 			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
 		}, logger),
-		dnsfilter.NewSomeoneWhoCares([]string{
+		domainfilter.NewSomeoneWhoCares([]string{
 			"https://someonewhocares.org/hosts/hosts",
+		}, logger),
+		// ja3 filters
+		ja3filter.NewAbuse([]string{
+			"https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv",
 		}, logger),
 	}
 }

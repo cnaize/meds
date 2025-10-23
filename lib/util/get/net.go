@@ -9,6 +9,7 @@ import (
 	"darvaza.org/x/tls/sni"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/open-ch/ja3"
 
 	"github.com/cnaize/meds/lib/util"
 )
@@ -135,6 +136,20 @@ func Domains(packet gopacket.Packet) []string {
 	}
 
 	return domains
+}
+
+func JA3(packet gopacket.Packet) (string, bool) {
+	tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
+	if !ok {
+		return "", false
+	}
+
+	j, err := ja3.ComputeJA3FromSegment(tcp.LayerPayload())
+	if err != nil {
+		return "", false
+	}
+
+	return j.GetJA3Hash(), true
 }
 
 func ReversedDomain(domain string) string {

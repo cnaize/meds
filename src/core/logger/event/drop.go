@@ -44,8 +44,10 @@ func (e Drop) Send(logger *zerolog.Logger) {
 			switch e.Filter {
 			case filter.FilterTypeRate, filter.FilterTypeIP:
 				target = ip4.SrcIP.String()
-			case filter.FilterTypeDNS:
+			case filter.FilterTypeDomain:
 				target = strings.Join(get.Domains(e.Packet), ",")
+			case filter.FilterTypeJA3:
+				target, _ = get.JA3(e.Packet)
 			}
 
 			logger.
