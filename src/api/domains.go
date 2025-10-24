@@ -19,7 +19,7 @@ func domainListGetAll(list *types.DomainList, mu *sync.Mutex) func(*gin.Context)
 	return func(c *gin.Context) {
 		mu.Lock()
 		defer mu.Unlock()
-		
+
 		c.JSON(http.StatusOK, Out{Domains: list.GetAll()})
 	}
 }

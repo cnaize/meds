@@ -14,7 +14,7 @@ import (
 	"github.com/cnaize/meds/lib/util"
 )
 
-func PacketSrcIP(packet gopacket.Packet) (netip.Addr, bool) {
+func SrcIP(packet gopacket.Packet) (netip.Addr, bool) {
 	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 	if !ok {
 		return netip.Addr{}, false

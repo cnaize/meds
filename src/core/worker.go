@@ -98,7 +98,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// accept invalid packet
-	srcIP, ok := get.PacketSrcIP(packet)
+	srcIP, ok := get.SrcIP(packet)
 	if !ok {
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet skipped", "invalid packet", filter.FilterTypeIP, packet))
 

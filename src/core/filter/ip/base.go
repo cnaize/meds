@@ -20,8 +20,8 @@ type Base struct {
 
 func NewBase(urls []string, logger *logger.Logger) *Base {
 	return &Base{
-		urls:      urls,
-		logger:    logger,
+		urls:   urls,
+		logger: logger,
 	}
 }
 
@@ -36,7 +36,7 @@ func (f *Base) Load(ctx context.Context) error {
 }
 
 func (f *Base) Check(packet gopacket.Packet) bool {
-	srcIP, ok := get.PacketSrcIP(packet)
+	srcIP, ok := get.SrcIP(packet)
 	if !ok {
 		return true
 	}

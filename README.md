@@ -1,8 +1,10 @@
 ![Go Version](https://img.shields.io/badge/go-1.24+-00ADD8?logo=go)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Status](https://img.shields.io/badge/status-stable-success)
 ![Version](https://img.shields.io/badge/version-v0.4.0-blue)
+![Status](https://img.shields.io/badge/status-stable-success)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
 ---
 

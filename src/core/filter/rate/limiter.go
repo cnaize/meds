@@ -64,7 +64,7 @@ func (f *Limiter) Load(ctx context.Context) error {
 }
 
 func (f *Limiter) Check(packet gopacket.Packet) bool {
-	srcIP, ok := get.PacketSrcIP(packet)
+	srcIP, ok := get.SrcIP(packet)
 	if !ok {
 		return true
 	}
