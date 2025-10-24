@@ -1,8 +1,8 @@
 ![Go Version](https://img.shields.io/badge/go-1.24+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Status](https://img.shields.io/badge/status-beta-success)
-![Version](https://img.shields.io/badge/version-v0.3.1-blue)
+![Status](https://img.shields.io/badge/status-stable-success)
+![Version](https://img.shields.io/badge/version-v0.4.0-blue)
 
 ---
 
@@ -24,10 +24,10 @@ It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in 
 Since Meds interacts directly with iptables and NFQUEUE, you must run it with **root privileges** (`sudo`).  
 The application manages iptables rules automatically.
 
-### Run the firewall
+### Build and run
 
 ```bash
-go build -o meds cmd/daemon/main.go
+go build -o meds ./cmd/daemon
 sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
 ```
 API available at http://localhost:8000 (Basic Auth: `admin` / `mypass`)
@@ -104,12 +104,19 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
   - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)  
   - Domain blacklists: [StevenBlack hosts](https://github.com/StevenBlack/hosts/), [SomeoneWhoCares hosts](https://someonewhocares.org/hosts/)
 
+- **TLS SNI & JA3 filtering**  
+  Extracts and inspects TLS ClientHello data directly from TCP payload before handshake completion:
+  - Filters by SNI (domain in TLS handshake)  
+  - Filters by JA3 fingerprint using the [Abuse.ch SSLBL JA3 database](https://sslbl.abuse.ch/ja3-fingerprints/)
+
+  Allows real-time blocking of malicious TLS clients (e.g., malware beacons, scanners, or C2 frameworks).
+
 - **Rate Limiting per IP**  
   Uses token bucket algorithm to limit burst and sustained traffic per source IP.  
   Protects against high-frequency floods (SYN, DNS, ICMP, or generic packet floods).
 
 - **HTTP API for runtime configuration**  
-  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP or DNS entries in global whitelists/blacklists.  
+  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP/Domain entries in global whitelists/blacklists.  
   Auth via BasicAuth using `MEDS_USERNAME` / `MEDS_PASSWORD`.
 
 - **Prometheus metrics export**  
@@ -127,16 +134,18 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
   Uses [radix tree](https://github.com/armon/go-radix) and [bart](https://github.com/gaissmai/bart) for IP/domain matching at scale.
 
 - **Extensible design**  
-  Modular architecture allows adding new filters (GeoIP, ASN, SNI/TLS filtering).
+  Modular architecture allows adding new filters (GeoIP, ASN, etc).
 
 ---
 
 ## 🔍 How It Works
 ```text
 [Kernel] → [NFQUEUE] → [Meds]
-                     ↳ Whitelist
+                     ↳ Global Whitelist (IP / Domain)
                      ↳ Rate Limiter
-                     ↳ Blacklist
+                     ↳ IP / Domain Filter
+                     ↳ TLS Filter (SNI / JA3)
+                     ↳ Global Blacklist (IP / Domain)
                      ↳ Decision: ACCEPT / DROP
 ```
 
@@ -145,17 +154,20 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
 
 2. **Classification pipeline**  
    Packets go through multiple filters:
-   - Global IP/DNS whitelist check  
+   - Global IP/Domain whitelist check  
    - Rate Limiting per source IP  
-   - IP/DNS blacklist check (per-filter and global)  
+   - IP/Domain check
+   - SNI/JA3 check
+   - Global IP/Domain blacklist check  
 
 3. **Decision engine**  
    - **ACCEPT** → packet is safe, passed to kernel stack  
    - **DROP** → packet is malicious, discarded immediately  
 
 4. **Metrics & logging**  
-   Every decision is counted and exported via Prometheus for monitoring and alerting.  
-   All events are asynchronously logged to minimize packet processing latency.
+   Every decision is counted and exported for monitoring and alerting.  
+   Metrics are exposed in Prometheus format and can be visualized with Grafana.  
+   All events are asynchronously logged to minimize packet processing latency.  
 
 ---
 
@@ -167,7 +179,7 @@ meds_core_packets_accepted_total{filter="empty",reason="default"} 2165
 meds_core_packets_accepted_total{filter="ip",reason="whitelisted"} 102
 
 # Total number of dropped packets
-meds_core_packets_dropped_total{filter="dns",reason="StevenBlack"} 3
+meds_core_packets_dropped_total{filter="domain",reason="StevenBlack"} 3
 meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 167
 
 # Total number of processed packets
@@ -180,3 +192,10 @@ meds_core_packets_processed_total 2437
 
 Meds is released under the **MIT License**.  
 See [LICENSE](./LICENSE) for details.
+
+---
+
+## 🤝 Contributing
+
+Pull requests and feature suggestions are welcome!  
+If you find a bug, please open an issue or submit a fix.
