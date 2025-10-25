@@ -1,0 +1,381 @@
+definitions:
+  api.CheckDomainResp:
+    properties:
+      found:
+        type: boolean
+    type: object
+  api.CheckSubnetResp:
+    properties:
+      found:
+        type: boolean
+    type: object
+  api.GetDomainsResp:
+    properties:
+      domains:
+        items:
+          type: string
+        type: array
+    type: object
+  api.GetSubnetsResp:
+    properties:
+      subnets:
+        items:
+          type: string
+        type: array
+    type: object
+  api.RemoveDomainsReq:
+    properties:
+      domains:
+        items:
+          type: string
+        type: array
+    type: object
+  api.RemoveSubnetsReq:
+    properties:
+      subnets:
+        items:
+          type: string
+        type: array
+    type: object
+  api.UpsertDomainsReq:
+    properties:
+      domains:
+        items:
+          type: string
+        type: array
+    type: object
+  api.UpsertSubnetsReq:
+    properties:
+      subnets:
+        items:
+          type: string
+        type: array
+    type: object
+info:
+  contact:
+    name: cnaize
+    url: https://github.com/cnaize/meds
+  description: NFQUEUE firewall written in Go
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: 'Meds: net healing'
+  version: v0.5.0
+paths:
+  /v1/blacklist/domains:
+    delete:
+      consumes:
+      - application/json
+      description: remove domains from blacklist
+      parameters:
+      - description: domains to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveDomainsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove blacklisted domains
+      tags:
+      - blacklist
+    get:
+      description: get all blacklisted domains
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetDomainsResp'
+      summary: Get blacklisted domains
+      tags:
+      - blacklist
+    post:
+      consumes:
+      - application/json
+      description: upsert domains to blacklist
+      parameters:
+      - description: domains to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertDomainsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert blacklisted domains
+      tags:
+      - blacklist
+  /v1/blacklist/domains/{domain}:
+    get:
+      description: check if a domain is blacklisted
+      parameters:
+      - description: domain to check
+        in: path
+        name: domain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckDomainResp'
+      summary: Check blacklisted domain
+      tags:
+      - blacklist
+  /v1/blacklist/subnets:
+    delete:
+      consumes:
+      - application/json
+      description: remove subnets from blacklist
+      parameters:
+      - description: subnets to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveSubnetsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove blacklisted subnets
+      tags:
+      - blacklist
+    get:
+      description: get all blacklisted subnets
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetSubnetsResp'
+      summary: Get blacklisted subnets
+      tags:
+      - blacklist
+    post:
+      consumes:
+      - application/json
+      description: upsert subnets to blacklist
+      parameters:
+      - description: subnets to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertSubnetsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert blacklisted subnets
+      tags:
+      - blacklist
+  /v1/blacklist/subnets/{subnet}:
+    get:
+      description: check if a subnet is blacklisted
+      parameters:
+      - description: subnet to check
+        in: path
+        name: subnet
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckSubnetResp'
+        "400":
+          description: Bad Request
+      summary: Check blacklisted subnet
+      tags:
+      - blacklist
+  /v1/whitelist/domains:
+    delete:
+      consumes:
+      - application/json
+      description: remove domains from whitelist
+      parameters:
+      - description: domains to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveDomainsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove whitelisted domains
+      tags:
+      - whitelist
+    get:
+      description: get all whitelisted domains
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetDomainsResp'
+      summary: Get whitelisted domains
+      tags:
+      - whitelist
+    post:
+      consumes:
+      - application/json
+      description: upsert domains to whitelist
+      parameters:
+      - description: domains to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertDomainsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert whitelisted domains
+      tags:
+      - whitelist
+  /v1/whitelist/domains/{domain}:
+    get:
+      description: check if a domain is whitelisted
+      parameters:
+      - description: domain to check
+        in: path
+        name: domain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckDomainResp'
+      summary: Check whitelisted domain
+      tags:
+      - whitelist
+  /v1/whitelist/subnets:
+    delete:
+      consumes:
+      - application/json
+      description: remove subnets from whitelist
+      parameters:
+      - description: subnets to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveSubnetsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove whitelisted subnets
+      tags:
+      - whitelist
+    get:
+      description: get all whitelisted subnets
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetSubnetsResp'
+      summary: Get whitelisted subnets
+      tags:
+      - whitelist
+    post:
+      consumes:
+      - application/json
+      description: upsert subnets to whitelist
+      parameters:
+      - description: subnets to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertSubnetsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert whitelisted subnets
+      tags:
+      - whitelist
+  /v1/whitelist/subnets/{subnet}:
+    get:
+      description: check if a subnet is whitelisted
+      parameters:
+      - description: subnet to check
+        in: path
+        name: subnet
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckSubnetResp'
+        "400":
+          description: Bad Request
+      summary: Check whitelisted subnet
+      tags:
+      - whitelist
+swagger: "2.0"

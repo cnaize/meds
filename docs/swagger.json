@@ -1,0 +1,584 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "NFQUEUE firewall written in Go",
+        "title": "Meds: net healing",
+        "contact": {
+            "name": "cnaize",
+            "url": "https://github.com/cnaize/meds"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "v0.5.0"
+    },
+    "paths": {
+        "/v1/blacklist/domains": {
+            "get": {
+                "description": "get all blacklisted domains",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Get blacklisted domains",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetDomainsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert domains to blacklist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Upsert blacklisted domains",
+                "parameters": [
+                    {
+                        "description": "domains to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertDomainsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove domains from blacklist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Remove blacklisted domains",
+                "parameters": [
+                    {
+                        "description": "domains to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveDomainsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/blacklist/domains/{domain}": {
+            "get": {
+                "description": "check if a domain is blacklisted",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Check blacklisted domain",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "domain to check",
+                        "name": "domain",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckDomainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/blacklist/subnets": {
+            "get": {
+                "description": "get all blacklisted subnets",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Get blacklisted subnets",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetSubnetsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert subnets to blacklist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Upsert blacklisted subnets",
+                "parameters": [
+                    {
+                        "description": "subnets to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertSubnetsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove subnets from blacklist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Remove blacklisted subnets",
+                "parameters": [
+                    {
+                        "description": "subnets to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveSubnetsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/blacklist/subnets/{subnet}": {
+            "get": {
+                "description": "check if a subnet is blacklisted",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Check blacklisted subnet",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "subnet to check",
+                        "name": "subnet",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckSubnetResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/v1/whitelist/domains": {
+            "get": {
+                "description": "get all whitelisted domains",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "whitelist"
+                ],
+                "summary": "Get whitelisted domains",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetDomainsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert domains to whitelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "whitelist"
+                ],
+                "summary": "Upsert whitelisted domains",
+                "parameters": [
+                    {
+                        "description": "domains to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertDomainsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove domains from whitelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "whitelist"
+                ],
+                "summary": "Remove whitelisted domains",
+                "parameters": [
+                    {
+                        "description": "domains to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveDomainsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/whitelist/domains/{domain}": {
+            "get": {
+                "description": "check if a domain is whitelisted",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "whitelist"
+                ],
+                "summary": "Check whitelisted domain",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "domain to check",
+                        "name": "domain",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckDomainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whitelist/subnets": {
+            "get": {
+                "description": "get all whitelisted subnets",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "whitelist"
+                ],
+                "summary": "Get whitelisted subnets",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetSubnetsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert subnets to whitelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "whitelist"
+                ],
+                "summary": "Upsert whitelisted subnets",
+                "parameters": [
+                    {
+                        "description": "subnets to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertSubnetsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove subnets from whitelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "whitelist"
+                ],
+                "summary": "Remove whitelisted subnets",
+                "parameters": [
+                    {
+                        "description": "subnets to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveSubnetsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/whitelist/subnets/{subnet}": {
+            "get": {
+                "description": "check if a subnet is whitelisted",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "whitelist"
+                ],
+                "summary": "Check whitelisted subnet",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "subnet to check",
+                        "name": "subnet",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckSubnetResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.CheckDomainResp": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.CheckSubnetResp": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.GetDomainsResp": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.GetSubnetsResp": {
+            "type": "object",
+            "properties": {
+                "subnets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.RemoveDomainsReq": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.RemoveSubnetsReq": {
+            "type": "object",
+            "properties": {
+                "subnets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.UpsertDomainsReq": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.UpsertSubnetsReq": {
+            "type": "object",
+            "properties": {
+                "subnets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}
