@@ -1,38 +1,48 @@
-![Go Version](https://img.shields.io/badge/go-1.24+-00ADD8?logo=go)
+![Go Version](https://img.shields.io/badge/go-1.25+-00ADD8?logo=go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.4.0-blue)
+![Version](https://img.shields.io/badge/version-v0.5.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
 ---
 
-# Meds: net healing
+# Meds: net healing  
+> A modern, lock-free firewall powered by NFQUEUE and Go
 
-**Meds** is a high-performance firewall system written in Go.  
-It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering to block malicious or unwanted traffic in real time.
+It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering to block malicious or unwanted traffic in real-time.
 
 *Meds — "net healing" firewall designed to cure your network from malicious traffic.*
 
 ---
 
-## 🚀 Usage
+## 🚀 Installation
 
 **Requirements:**
-- [Go](https://go.dev/) version [1.24](https://go.dev/doc/devel/release#go1.24.0) or above.
 - Linux with **iptables** + **NFQUEUE** support
+- **Root privileges** (`sudo`) — required for interacting with iptables/NFQUEUE  
 
-Since Meds interacts directly with iptables and NFQUEUE, you must run it with **root privileges** (`sudo`).  
 The application manages iptables rules automatically.
 
-### Build and run
+### Download
+
+Download the latest binary from [Releases](https://github.com/cnaize/meds/releases) or build from sources.
+
+### Build from sources
 
 ```bash
 go build -o meds ./cmd/daemon
-sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
 ```
-API available at http://localhost:8000 (Basic Auth: `admin` / `mypass`)
+
+## 🧩 Quickstart
+
+```bash
+sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
+# Metrics available at: http://localhost:8000/metrics
+# API available at: http://localhost:8000/swagger/index.html
+# Basic Auth: admin / mypass
+```
 
 ### Command-line options
 ```text
@@ -62,32 +72,25 @@ Usage of ./meds:
         nfqueue workers count (default 12)
 ```
 
-### Prometheus metrics
+### Prometheus metrics  
+👉 http://localhost:8000/metrics  
 
-By default, metrics are exposed at:
+The metrics endpoint is protected by the same **BasicAuth** credentials as the API.
 
-```bash
-curl -u admin:mypass http://localhost:8000/v1/metrics
-```
-The metrics endpoint is protected by the same BasicAuth credentials as the API.
+### Swagger UI
 
-### Example API usage (see [api.go](./src/api/api.go))
+Meds provides a **built-in** REST API for managing IPs/Domains whitelist and blacklist.  
+It’s automatically served when you run Meds. Protected by the same **BasicAuth** credentials as the API.  
 
-```bash
-# Check IP is in whitelist
-curl -u admin:mypass -X GET http://localhost:8000/v1/whitelist/subnets/200.168.0.1
+**Interactive API docs:**  
+👉 http://localhost:8000/swagger/index.html
 
-# Add subnet to whitelist
-curl -u admin:mypass -X POST http://localhost:8000/v1/whitelist/subnets \
-  -d '{"subnets": ["200.168.0.0/16"]}'
+You can browse and test all API endpoints directly from your browser.  
 
-# Get all whitelist subnets
-curl -u admin:mypass -X GET http://localhost:8000/v1/whitelist/subnets
+**OpenAPI spec (JSON):**  
+👉 http://localhost:8000/swagger/doc.json
 
-# Remove subnet from whitelist
-curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
-  -d '{"subnets": ["200.168.0.0/16"]}'
-```
+You can import this spec into Postman, Insomnia, or Hoppscotch.  
 
 ---
 
@@ -111,7 +114,7 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
   - Filters by SNI (domain in TLS handshake)  
   - Filters by JA3 fingerprint using the [Abuse.ch SSLBL JA3 database](https://sslbl.abuse.ch/ja3-fingerprints/)
 
-  Allows real-time blocking of malicious TLS clients (e.g., malware beacons, scanners, or C2 frameworks).
+  Enables real-time blocking of malicious TLS clients such as malware beacons, scanners, or C2 frameworks.
 
 - **Rate Limiting per IP**  
   Uses token bucket algorithm to limit burst and sustained traffic per source IP.  
@@ -127,7 +130,7 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
   - Dropped packets (with reasons)
   - Accepted packets (with reasons)
 
-  Metrics are available at `/v1/metrics` via the built-in API server, compatible with Prometheus scrape targets.
+  Metrics are available at `/metrics` via the built-in API server, compatible with Prometheus scrape targets.
  
 - **Asynchronous logging**  
   Uses [zerolog](https://github.com/rs/zerolog) with worker-based async logging for minimal overhead.
@@ -168,7 +171,7 @@ curl -u admin:mypass -X DELETE http://localhost:8000/v1/whitelist/subnets \
 
 4. **Metrics & logging**  
    Every decision is counted and exported for monitoring and alerting.  
-   Metrics are exposed in Prometheus format and can be visualized with Grafana.  
+   Metrics are Prometheus-compatible and can be visualized in Grafana.    
    All events are asynchronously logged to minimize packet processing latency.  
 
 ---
@@ -201,3 +204,7 @@ See [LICENSE](./LICENSE) for details.
 
 Pull requests and feature suggestions are welcome!  
 If you find a bug, please open an issue or submit a fix.
+
+---
+
+Made with ❤️ in Go
