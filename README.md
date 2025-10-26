@@ -79,9 +79,6 @@ The metrics endpoint is protected by the same **BasicAuth** credentials as the A
 
 ### Swagger UI
 
-Meds provides a **built-in** REST API for managing IPs/Domains whitelist and blacklist.  
-It’s automatically served when you run Meds. Protected by the same **BasicAuth** credentials as the API.  
-
 **Interactive API docs:**  
 👉 http://localhost:8000/swagger/index.html
 
