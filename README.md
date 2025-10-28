@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.5.0-blue)
+![Version](https://img.shields.io/badge/version-v0.5.1-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
