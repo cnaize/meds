@@ -5,11 +5,10 @@ import (
 	"sync/atomic"
 
 	"github.com/armon/go-radix"
-	"github.com/google/gopacket"
 
-	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/types"
 )
 
 type Base struct {
@@ -35,11 +34,10 @@ func (f *Base) Load(ctx context.Context) error {
 	return nil
 }
 
-func (f *Base) Check(packet gopacket.Packet) bool {
+func (f *Base) Check(packet *types.Packet) bool {
 	list := f.blacklist.Load()
-	for _, domain := range get.Domains(packet) {
-		domain = get.ReversedDomain(domain)
-		if _, _, found := list.LongestPrefix(domain); found {
+	for _, revDomain := range packet.GetReversedDomains() {
+		if _, _, found := list.LongestPrefix(revDomain); found {
 			return false
 		}
 	}

@@ -7,11 +7,8 @@ import (
 	"slices"
 
 	"github.com/florianl/go-nfqueue/v2"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/rs/zerolog"
 
-	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/core/logger/event"
@@ -86,11 +83,9 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 		return 0
 	}
 
-	// WARNING:
-	// 1. DON'T MODIFY THE PACKET (NoCopy: true)
-	// 2. NOT THREAD SAFE (Lazy: true)
-	packet := gopacket.NewPacket(*a.Payload, layers.LayerTypeIPv4, gopacket.DecodeOptions{NoCopy: true, Lazy: true})
-	if err := packet.ErrorLayer(); err != nil {
+	// accept broken packet
+	packet, err := types.NewPacket(*a.Payload)
+	if err != nil {
 		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "decode failed", filter.FilterTypeEmpty, nil))
 
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
@@ -98,7 +93,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// accept invalid packet
-	srcIP, ok := get.SrcIP(packet)
+	srcIP, ok := packet.GetSrcIP()
 	if !ok {
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet skipped", "invalid packet", filter.FilterTypeIP, packet))
 
@@ -116,7 +111,7 @@ func (w *Worker) hookFn(a nfqueue.Attribute) int {
 	}
 
 	// pass through domain whitelist
-	domains := get.Domains(packet)
+	domains := packet.GetDomains()
 	if slices.ContainsFunc(domains, w.dmWhiteList.Lookup) {
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeDomain, packet))
 

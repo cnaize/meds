@@ -3,13 +3,11 @@ package event
 import (
 	"strings"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/rs/zerolog"
 
-	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/metrics"
+	"github.com/cnaize/meds/src/types"
 )
 
 var _ Sender = Accept{}
@@ -19,10 +17,10 @@ type Accept struct {
 
 	Reason string
 	Filter filter.FilterType
-	Packet gopacket.Packet
+	Packet *types.Packet
 }
 
-func NewAccept(lvl zerolog.Level, msg, reason string, filter filter.FilterType, packet gopacket.Packet) Accept {
+func NewAccept(lvl zerolog.Level, msg, reason string, filter filter.FilterType, packet *types.Packet) Accept {
 	return Accept{
 		Message: NewMessage(lvl, msg),
 		Reason:  reason,
@@ -39,27 +37,27 @@ func (e Accept) Send(logger *zerolog.Logger) {
 	}()
 
 	if e.Packet != nil {
-		if ip4, ok := e.Packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4); ok {
-			var target string
-			switch e.Filter {
-			case filter.FilterTypeRate, filter.FilterTypeIP:
-				target = ip4.SrcIP.String()
-			case filter.FilterTypeDomain:
-				target = strings.Join(get.Domains(e.Packet), ",")
-			case filter.FilterTypeJA3:
-				target, _ = get.JA3(e.Packet)
+		var target string
+		switch e.Filter {
+		case filter.FilterTypeRate, filter.FilterTypeIP:
+			if srcIP, ok := e.Packet.GetSrcIP(); ok {
+				target = srcIP.String()
 			}
-
-			logger.
-				WithLevel(e.Lvl).
-				Str("target", target).
-				Str("action", string(ActionTypeAccept)).
-				Str("reason", e.Reason).
-				Str("filter", string(e.Filter)).
-				Msg(e.Msg)
-
-			return
+		case filter.FilterTypeDomain:
+			target = strings.Join(e.Packet.GetDomains(), ",")
+		case filter.FilterTypeJA3:
+			target, _ = e.Packet.GetJA3()
 		}
+
+		logger.
+			WithLevel(e.Lvl).
+			Str("target", target).
+			Str("action", string(ActionTypeAccept)).
+			Str("reason", e.Reason).
+			Str("filter", string(e.Filter)).
+			Msg(e.Msg)
+
+		return
 	}
 
 	logger.

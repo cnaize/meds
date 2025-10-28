@@ -4,11 +4,9 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/google/gopacket"
-
-	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/types"
 )
 
 type Base struct {
@@ -34,8 +32,8 @@ func (f *Base) Load(ctx context.Context) error {
 	return nil
 }
 
-func (f *Base) Check(packet gopacket.Packet) bool {
-	hash, ok := get.JA3(packet)
+func (f *Base) Check(packet *types.Packet) bool {
+	hash, ok := packet.GetJA3()
 	if !ok {
 		return true
 	}

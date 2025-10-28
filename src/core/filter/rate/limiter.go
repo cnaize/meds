@@ -6,13 +6,12 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/google/gopacket"
 	"github.com/maypok86/otter/v2"
 
-	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/core/metrics"
+	"github.com/cnaize/meds/src/types"
 )
 
 var _ filter.Filter = (*Limiter)(nil)
@@ -63,8 +62,8 @@ func (f *Limiter) Load(ctx context.Context) error {
 	return nil
 }
 
-func (f *Limiter) Check(packet gopacket.Packet) bool {
-	srcIP, ok := get.SrcIP(packet)
+func (f *Limiter) Check(packet *types.Packet) bool {
+	srcIP, ok := packet.GetSrcIP()
 	if !ok {
 		return true
 	}

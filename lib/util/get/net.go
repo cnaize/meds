@@ -122,16 +122,12 @@ func SNI(packet gopacket.Packet) (string, bool) {
 		return "", false
 	}
 
-	if len(info.ServerName) < 1 {
-		return "", false
-	}
-
 	return info.ServerName, true
 }
 
 func Domains(packet gopacket.Packet) []string {
 	domains := DNSDomains(packet)
-	if sni, ok := SNI(packet); ok {
+	if sni, ok := SNI(packet); ok && len(sni) > 0 {
 		domains = append(domains, sni)
 	}
 

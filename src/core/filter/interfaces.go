@@ -3,7 +3,7 @@ package filter
 import (
 	"context"
 
-	"github.com/google/gopacket"
+	"github.com/cnaize/meds/src/types"
 )
 
 type FilterType string
@@ -29,7 +29,7 @@ type Loader interface {
 }
 
 type Checker interface {
-	Check(packet gopacket.Packet) bool
+	Check(packet *types.Packet) bool
 }
 
 type Updater interface {

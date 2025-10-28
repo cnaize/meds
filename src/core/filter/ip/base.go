@@ -5,11 +5,10 @@ import (
 	"sync/atomic"
 
 	"github.com/gaissmai/bart"
-	"github.com/google/gopacket"
 
-	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/types"
 )
 
 type Base struct {
@@ -35,8 +34,8 @@ func (f *Base) Load(ctx context.Context) error {
 	return nil
 }
 
-func (f *Base) Check(packet gopacket.Packet) bool {
-	srcIP, ok := get.SrcIP(packet)
+func (f *Base) Check(packet *types.Packet) bool {
+	srcIP, ok := packet.GetSrcIP()
 	if !ok {
 		return true
 	}
