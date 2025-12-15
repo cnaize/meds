@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.5.1-blue)
+![Version](https://img.shields.io/badge/version-v0.5.2-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -54,20 +54,24 @@ Usage of ./meds:
         path to database file (default "meds.db")
   -log-level string
         zerolog level (default "info")
+  -logger-queue-len uint
+        logger queue length (all workers) (default 1024)
   -loggers-count uint
         logger workers count (default 12)
   -max-packets-at-once uint
-        max packets per ip at once (default 2000)
+        max packets per ip at once (default 1500)
   -max-packets-cache-size uint
-        max packets per ip cache size (default 10000)
+        max packets per ip cache size (default 100000)
   -max-packets-cache-ttl duration
         max packets per ip cache ttl (default 3m0s)
   -max-packets-per-second uint
-        max packets per ip per second (default 100)
+        max packets per ip per second (default 3000)
   -update-interval duration
-        update frequency (default 12h0m0s)
+        update frequency (default 4h0m0s)
   -update-timeout duration
         update timeout (per filter) (default 10s)
+  -worker-queue-len uint
+        nfqueue queue length (per worker) (default 8192)
   -workers-count uint
         nfqueue workers count (default 12)
 ```

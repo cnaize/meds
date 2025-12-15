@@ -1,12 +1,12 @@
 package api
 
 //	@title			Meds: net healing
-//	@version		v0.5.0
+//	@version		v0.5.2
 //	@description	NFQUEUE firewall written in Go
-
+//
 //	@contact.name	cnaize
 //	@contact.url	https://github.com/cnaize/meds
-
+//
 //	@license.name	MIT
 //	@license.url	https://opensource.org/licenses/MIT
 

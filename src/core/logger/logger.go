@@ -13,10 +13,10 @@ type Logger struct {
 	events chan event.Sender
 }
 
-func NewLogger(logger *zerolog.Logger) *Logger {
+func NewLogger(logger *zerolog.Logger, qlen uint) *Logger {
 	return &Logger{
 		logger: logger,
-		events: make(chan event.Sender, 256),
+		events: make(chan event.Sender, qlen),
 	}
 }
 

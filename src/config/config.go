@@ -9,7 +9,9 @@ type Config struct {
 	DBFilePath string
 	// core
 	WorkersCount uint
+	WorkerQLen   uint
 	LoggersCount uint
+	LoggerQLen   uint
 	// filter
 	UpdateTimeout  time.Duration
 	UpdateInterval time.Duration

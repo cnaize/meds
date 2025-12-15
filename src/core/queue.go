@@ -22,6 +22,7 @@ type Queue struct {
 
 func NewQueue(
 	qcount uint,
+	wqlen uint,
 	subnetWhiteList *types.SubnetList,
 	subnetBlackList *types.SubnetList,
 	domainWhiteList *types.DomainList,
@@ -33,7 +34,7 @@ func NewQueue(
 	// WARNING: always balancing NFQUEUE from 0
 	for qnum := 0; qnum < int(qcount); qnum++ {
 		workers = append(workers,
-			NewWorker(uint16(qnum), subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, filters, logger),
+			NewWorker(uint16(qnum), uint32(wqlen), subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, filters, logger),
 		)
 	}
 

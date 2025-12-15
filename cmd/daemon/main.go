@@ -34,12 +34,14 @@ func main() {
 	flag.StringVar(&cfg.DBFilePath, "db-path", "meds.db", "path to database file")
 	flag.StringVar(&cfg.APIServerAddr, "api-addr", ":8000", "api server address")
 	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
+	flag.UintVar(&cfg.WorkerQLen, "worker-queue-len", 8192, "nfqueue queue length (per worker)")
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
+	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 1024, "logger queue length (all workers)")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", 10*time.Second, "update timeout (per filter)")
-	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 12*time.Hour, "update frequency")
-	flag.UintVar(&cfg.LimiterMaxBalance, "max-packets-at-once", 2000, "max packets per ip at once")
-	flag.UintVar(&cfg.LimiterRefillRate, "max-packets-per-second", 100, "max packets per ip per second")
-	flag.UintVar(&cfg.LimiterCacheSize, "max-packets-cache-size", 10_000, "max packets per ip cache size")
+	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
+	flag.UintVar(&cfg.LimiterMaxBalance, "max-packets-at-once", 1500, "max packets per ip at once")
+	flag.UintVar(&cfg.LimiterRefillRate, "max-packets-per-second", 3000, "max packets per ip per second")
+	flag.UintVar(&cfg.LimiterCacheSize, "max-packets-cache-size", 100_000, "max packets per ip cache size")
 	flag.DurationVar(&cfg.LimiterBucketTTL, "max-packets-cache-ttl", 3*time.Minute, "max packets per ip cache ttl")
 	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
 	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
@@ -62,8 +64,9 @@ func main() {
 			With().
 			Timestamp().
 			Logger().
-			Level(logLevel),
-	))
+			Level(logLevel)),
+		cfg.LoggerQLen,
+	)
 	logger.Run(mainCtx, cfg.LoggersCount)
 
 	// check username/password
@@ -91,7 +94,7 @@ func main() {
 	filters := newFilters(cfg, logger)
 
 	// create queue
-	q := core.NewQueue(cfg.WorkersCount, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, filters, logger)
+	q := core.NewQueue(cfg.WorkersCount, cfg.WorkerQLen, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, filters, logger)
 	if err := q.Load(mainCtx); err != nil {
 		logger.Raw().Fatal().Err(err).Msg("queue load failed")
 	}

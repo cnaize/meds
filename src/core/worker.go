@@ -17,6 +17,7 @@ import (
 
 type Worker struct {
 	qnum uint16
+	qlen uint32
 
 	snWhiteList *types.SubnetList
 	snBlackList *types.SubnetList
@@ -31,6 +32,7 @@ type Worker struct {
 
 func NewWorker(
 	qnum uint16,
+	qlen uint32,
 	subnetWhiteList *types.SubnetList,
 	subnetBlackList *types.SubnetList,
 	domainWhiteList *types.DomainList,
@@ -40,6 +42,7 @@ func NewWorker(
 ) *Worker {
 	return &Worker{
 		qnum:        qnum,
+		qlen:        qlen,
 		snWhiteList: subnetWhiteList,
 		snBlackList: subnetBlackList,
 		dmWhiteList: domainWhiteList,
@@ -58,7 +61,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	// open nfqueue
 	nfq, err := nfqueue.Open(&nfqueue.Config{
 		NfQueue:      w.qnum,
-		MaxQueueLen:  0xFF,
+		MaxQueueLen:  w.qlen,
 		Copymode:     nfqueue.NfQnlCopyPacket,
 		MaxPacketLen: 0xFFFF,
 	})
