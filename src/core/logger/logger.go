@@ -33,8 +33,9 @@ func (l *Logger) Run(ctx context.Context, workers uint) {
 func (l *Logger) Log(e event.Sender) {
 	select {
 	case l.events <- e:
+		// good
 	default:
-		l.logger.Warn().Msgf("event dropped: %T", e)
+		l.logger.Warn().Msgf("logger event dropped: %T", e)
 	}
 }
 

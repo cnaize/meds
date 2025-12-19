@@ -33,16 +33,17 @@ func main() {
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
 	flag.StringVar(&cfg.DBFilePath, "db-path", "meds.db", "path to database file")
 	flag.StringVar(&cfg.APIServerAddr, "api-addr", ":8000", "api server address")
-	flag.UintVar(&cfg.WorkersCount, "workers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue workers count")
-	flag.UintVar(&cfg.WorkerQLen, "worker-queue-len", 8192, "nfqueue queue length (per worker)")
-	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(runtime.GOMAXPROCS(0)), "logger workers count")
-	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 1024, "logger queue length (all workers)")
+	flag.UintVar(&cfg.ReadersCount, "readers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue readers count")
+	flag.UintVar(&cfg.WorkersCount, "workers-count", 1, "nfqueue workers count (per reader)")
+	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(max(1, runtime.GOMAXPROCS(0)/4)), "logger workers count")
+	flag.UintVar(&cfg.ReaderQLen, "reader-queue-len", 4096, "nfqueue queue length (per reader)")
+	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", 10*time.Second, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
-	flag.UintVar(&cfg.LimiterMaxBalance, "max-packets-at-once", 1500, "max packets per ip at once")
-	flag.UintVar(&cfg.LimiterRefillRate, "max-packets-per-second", 3000, "max packets per ip per second")
-	flag.UintVar(&cfg.LimiterCacheSize, "max-packets-cache-size", 100_000, "max packets per ip cache size")
-	flag.DurationVar(&cfg.LimiterBucketTTL, "max-packets-cache-ttl", 3*time.Minute, "max packets per ip cache ttl")
+	flag.UintVar(&cfg.LimiterRefillRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
+	flag.UintVar(&cfg.LimiterMaxBalance, "rate-limiter-burst", 1500, "max packets at once (per ip)")
+	flag.UintVar(&cfg.LimiterCacheSize, "rate-limiter-cache-size", 100_000, "rate limiter cache size (all buckets)")
+	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-cache-ttl", 3*time.Minute, "rate limiter cache ttl (per bucket)")
 	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
 	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
 	// flag.StringVar(&cfg.Password, "password", "admin", "admin password")
@@ -94,7 +95,17 @@ func main() {
 	filters := newFilters(cfg, logger)
 
 	// create queue
-	q := core.NewQueue(cfg.WorkersCount, cfg.WorkerQLen, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, filters, logger)
+	q := core.NewQueue(
+		cfg.ReadersCount,
+		cfg.WorkersCount,
+		cfg.ReaderQLen,
+		subnetWhiteList,
+		subnetBlackList,
+		domainWhiteList,
+		domainBlackList,
+		filters,
+		logger,
+	)
 	if err := q.Load(mainCtx); err != nil {
 		logger.Raw().Fatal().Err(err).Msg("queue load failed")
 	}
@@ -102,7 +113,14 @@ func main() {
 
 	// create server
 	api := server.NewServer(
-		cfg.APIServerAddr, cfg.Username, cfg.Password, db, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList,
+		cfg.APIServerAddr,
+		cfg.Username,
+		cfg.Password,
+		db,
+		subnetWhiteList,
+		subnetBlackList,
+		domainWhiteList,
+		domainBlackList,
 	)
 
 	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(graceful.NewLogger()))
@@ -148,7 +166,13 @@ func main() {
 	<-m.Done()
 }
 
-func loadWhiteBlackLists(ctx context.Context, db *database.Database) (*types.SubnetList, *types.SubnetList, *types.DomainList, *types.DomainList, error) {
+func loadWhiteBlackLists(ctx context.Context, db *database.Database) (
+	*types.SubnetList,
+	*types.SubnetList,
+	*types.DomainList,
+	*types.DomainList,
+	error,
+) {
 	// load subnet whitelist
 	subnetWhiteList := types.NewSubnetList()
 	snWhiteList, err := db.Q.GetAllWhiteListSubnets(ctx, db.DB)

@@ -8,9 +8,10 @@ type Config struct {
 	LogLevel   string
 	DBFilePath string
 	// core
+	ReadersCount uint
 	WorkersCount uint
-	WorkerQLen   uint
 	LoggersCount uint
+	ReaderQLen   uint
 	LoggerQLen   uint
 	// filter
 	UpdateTimeout  time.Duration

@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.5.2-blue)
+![Version](https://img.shields.io/badge/version-v0.6.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -55,25 +55,27 @@ Usage of ./meds:
   -log-level string
         zerolog level (default "info")
   -logger-queue-len uint
-        logger queue length (all workers) (default 1024)
+        logger queue length (all workers) (default 2048)
   -loggers-count uint
-        logger workers count (default 12)
-  -max-packets-at-once uint
-        max packets per ip at once (default 1500)
-  -max-packets-cache-size uint
-        max packets per ip cache size (default 100000)
-  -max-packets-cache-ttl duration
-        max packets per ip cache ttl (default 3m0s)
-  -max-packets-per-second uint
-        max packets per ip per second (default 3000)
+        logger workers count (default 3)
+  -rate-limiter-burst uint
+        max packets at once (per ip) (default 1500)
+  -rate-limiter-cache-size uint
+        rate limiter cache size (all buckets) (default 100000)
+  -rate-limiter-cache-ttl duration
+        rate limiter cache ttl (per bucket) (default 3m0s)
+  -rate-limiter-rate uint
+        max packets per second (per ip) (default 3000)
+  -reader-queue-len uint
+        nfqueue queue length (per reader) (default 4096)
+  -readers-count uint
+        nfqueue readers count (default 12)
   -update-interval duration
         update frequency (default 4h0m0s)
   -update-timeout duration
         update timeout (per filter) (default 10s)
-  -worker-queue-len uint
-        nfqueue queue length (per worker) (default 8192)
   -workers-count uint
-        nfqueue workers count (default 12)
+        nfqueue workers count (per reader) (default 1)
 ```
 
 ### Prometheus metrics  
@@ -100,6 +102,11 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 - **NFQUEUE-based packet interception**  
   Uses Linux Netfilter queues to copy inbound packets into user space with minimal overhead.
 
+- **Decoupled reader / worker / logger model**  
+  - Readers drain NFQUEUE as fast as possible
+  - Workers perform CPU-intensive filtering
+  - Logger uses [zerolog](https://github.com/rs/zerolog) with worker-based async logging for minimal overhead
+
 - **Fast packet parsing with [gopacket](https://github.com/google/gopacket)**  
   Parses traffic efficiently (`lazy` and `no copy` modes enabled).
 
@@ -113,7 +120,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 - **TLS SNI & JA3 filtering**  
   Extracts and inspects TLS ClientHello data directly from TCP payload before handshake completion:
   - Filters by SNI (domain in TLS handshake)  
-  - Filters by JA3 fingerprint using the [Abuse.ch SSLBL JA3 database](https://sslbl.abuse.ch/ja3-fingerprints/)
+  - Filter by JA3 fingerprint using the [Abuse.ch SSLBL JA3 database](https://sslbl.abuse.ch/ja3-fingerprints/)
 
   Enables real-time blocking of malicious TLS clients such as malware beacons, scanners, or C2 frameworks.
 
@@ -132,9 +139,6 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   - Accepted packets (with reasons)
 
   Metrics are available at `/metrics` via the built-in API server, compatible with Prometheus scrape targets.
- 
-- **Asynchronous logging**  
-  Uses [zerolog](https://github.com/rs/zerolog) with worker-based async logging for minimal overhead.
 
 - **Efficient lookups**  
   Uses [radix tree](https://github.com/armon/go-radix) and [bart](https://github.com/gaissmai/bart) for IP/domain matching at scale.

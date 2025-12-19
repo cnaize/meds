@@ -14,15 +14,19 @@ import (
 
 type Queue struct {
 	qcount uint
-	logger *logger.Logger
+	wcount uint
 
+	logger  *logger.Logger
 	filters []filter.Filter
+
+	readers []*Reader
 	workers []*Worker
 }
 
 func NewQueue(
 	qcount uint,
-	wqlen uint,
+	wcount uint,
+	qlen uint,
 	subnetWhiteList *types.SubnetList,
 	subnetBlackList *types.SubnetList,
 	domainWhiteList *types.DomainList,
@@ -30,18 +34,35 @@ func NewQueue(
 	filters []filter.Filter,
 	logger *logger.Logger,
 ) *Queue {
-	workers := make([]*Worker, 0, qcount)
+	readers := make([]*Reader, 0, qcount)
+	workers := make([]*Worker, 0, qcount*wcount)
 	// WARNING: always balancing NFQUEUE from 0
 	for qnum := 0; qnum < int(qcount); qnum++ {
-		workers = append(workers,
-			NewWorker(uint16(qnum), uint32(wqlen), subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, filters, logger),
-		)
+		reader := NewReader(uint16(qnum), uint32(qlen), logger)
+
+		// workers per reader
+		for range wcount {
+			workers = append(workers,
+				NewWorker(
+					subnetWhiteList,
+					subnetBlackList,
+					domainWhiteList,
+					domainBlackList,
+					filters,
+					logger,
+				),
+			)
+		}
+
+		readers = append(readers, reader)
 	}
 
 	return &Queue{
 		qcount:  qcount,
+		wcount:  wcount,
 		logger:  logger,
 		filters: filters,
+		readers: readers,
 		workers: workers,
 	}
 }
@@ -60,10 +81,19 @@ func (q *Queue) Load(ctx context.Context) error {
 func (q *Queue) Run(ctx context.Context) error {
 	q.logger.Raw().Info().Msg("Running queue...")
 
-	// create workers
-	for _, worker := range q.workers {
-		if err := worker.Run(ctx); err != nil {
-			return fmt.Errorf("%d: worker run: %w", worker.qnum, err)
+	// run readers
+	for i, reader := range q.readers {
+		if err := reader.Run(ctx); err != nil {
+			return fmt.Errorf("%d: reader run: %w", reader.qnum, err)
+		}
+
+		// run workers
+		for j := i * int(q.wcount); j < i*int(q.wcount)+int(q.wcount); j++ {
+			go func() {
+				if err := q.workers[j].Run(ctx, reader.nfq, reader.wch); err != nil {
+					q.logger.Raw().Err(err).Msg("worker run")
+				}
+			}()
 		}
 	}
 
@@ -106,16 +136,16 @@ func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 
 func (q *Queue) Close() error {
 	var errs error
+	// close readers
+	for _, reader := range q.readers {
+		if err := reader.Close(); err != nil {
+			errs = errors.Join(errs, fmt.Errorf("reader close: %w", err))
+		}
+	}
+
 	// down iptables
 	if err := q.ipTablesDown(); err != nil {
 		errs = errors.Join(errs, fmt.Errorf("iptables down: %w", err))
-	}
-
-	// close workers
-	for _, worker := range q.workers {
-		if err := worker.Close(); err != nil {
-			errs = errors.Join(errs, err)
-		}
 	}
 
 	return errs
