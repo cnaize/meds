@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.6.0-blue)
+![Version](https://img.shields.io/badge/version-v0.6.1-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -105,7 +105,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 - **Decoupled reader / worker / logger model**  
   - Readers drain NFQUEUE as fast as possible
   - Workers perform CPU-intensive filtering
-  - Logger uses [zerolog](https://github.com/rs/zerolog) with worker-based async logging for minimal overhead
+  - Logger uses [zerolog](https://github.com/rs/zerolog) with async worker-based logging
 
 - **Fast packet parsing with [gopacket](https://github.com/google/gopacket)**  
   Parses traffic efficiently (`lazy` and `no copy` modes enabled).
@@ -129,7 +129,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   Protects against high-frequency floods (SYN, DNS, ICMP, or generic packet floods).
 
 - **HTTP API for runtime configuration**  
-  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP/Domain entries in global whitelists/blacklists.  
+  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP/Domain entries in global white/black lists.  
   Auth via BasicAuth using `MEDS_USERNAME` / `MEDS_PASSWORD`.
 
 - **Prometheus metrics export**  
@@ -151,11 +151,11 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 ## 🔍 How It Works
 ```text
 [Kernel] → [NFQUEUE] → [Meds]
-                     ↳ Global Whitelist (IP / Domain)
-                     ↳ Rate Limiter
-                     ↳ IP / Domain Filter
-                     ↳ TLS Filter (SNI / JA3)
-                     ↳ Global Blacklist (IP / Domain)
+                     ↳ Global IP Filters (white/black lists)
+                     ↳ Global Domain Filters (white/black lists)
+                     ↳ Rate Limiter (per source IP)
+                     ↳ IP / Domain Filters
+                     ↳ TLS Filters (SNI / JA3)
                      ↳ Decision: ACCEPT / DROP
 ```
 
@@ -163,12 +163,12 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
    All inbound packets are queued from Netfilter (`iptables` rule with `-j NFQUEUE`).
 
 2. **Classification pipeline**  
-   Packets go through multiple filters:
-   - Global IP/Domain whitelist check  
-   - Rate Limiting per source IP  
-   - IP/Domain check
-   - SNI/JA3 check
-   - Global IP/Domain blacklist check  
+   Packets are processed according to the following pipeline:
+   - **Global IP Filters** – checks against white/black lists
+   - **Global Domain Filters** – checks against white/black lists
+   - **Rate Limiter** – limits packet rate per source IP
+   - **IP / Domain Filters** – per-packet filtering rules
+   - **TLS Filters** – SNI and JA3 fingerprint checks
 
 3. **Decision engine**  
    - **ACCEPT** → packet is safe, passed to kernel stack  
