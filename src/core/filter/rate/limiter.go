@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"sync"
 	"time"
 
 	"github.com/maypok86/otter/v2"
@@ -21,8 +22,11 @@ type Limiter struct {
 	refillRate uint
 	cacheSize  uint
 	bucketTTL  time.Duration
-	logger     *logger.Logger
-	cache      *otter.Cache[netip.Addr, *Bucket]
+
+	logger *logger.Logger
+
+	cache *otter.Cache[netip.Addr, *Bucket]
+	bpool sync.Pool
 }
 
 func NewLimiter(maxBalance, refillRate, cacheSize uint, bucketTTL time.Duration, logger *logger.Logger) *Limiter {
@@ -32,6 +36,11 @@ func NewLimiter(maxBalance, refillRate, cacheSize uint, bucketTTL time.Duration,
 		cacheSize:  cacheSize,
 		bucketTTL:  bucketTTL,
 		logger:     logger,
+		bpool: sync.Pool{
+			New: func() any {
+				return NewBucket(maxBalance)
+			},
+		},
 	}
 }
 
@@ -49,7 +58,13 @@ func (f *Limiter) Load(ctx context.Context) error {
 			MaximumSize:       int(f.cacheSize),
 			ExpiryCalculator:  otter.ExpiryAccessing[netip.Addr, *Bucket](f.bucketTTL),
 			RefreshCalculator: otter.RefreshWriting[netip.Addr, *Bucket](time.Second),
-			StatsRecorder:     metrics.Get().RateLimiterCacheStats,
+			OnDeletion: func(e otter.DeletionEvent[netip.Addr, *Bucket]) {
+				f.bpool.Put(e.Value)
+			},
+			OnAtomicDeletion: func(e otter.DeletionEvent[netip.Addr, *Bucket]) {
+				f.bpool.Put(e.Value)
+			},
+			StatsRecorder: metrics.Get().RateLimiterCacheStats,
 		},
 	)
 	if err != nil {
@@ -71,7 +86,7 @@ func (f *Limiter) Check(packet *types.Packet) bool {
 	bucket, err := f.cache.Get(context.Background(), srcIP,
 		otter.LoaderFunc[netip.Addr, *Bucket](
 			func(ctx context.Context, key netip.Addr) (*Bucket, error) {
-				return NewBucket(f.maxBalance), nil
+				return f.bpool.Get().(*Bucket).Reset(f.maxBalance), nil
 			},
 		),
 	)

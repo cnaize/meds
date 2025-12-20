@@ -11,32 +11,35 @@ type Bucket struct {
 }
 
 func NewBucket(maxBalance uint) *Bucket {
-	var bucket Bucket
-	bucket.balance.Store(int64(maxBalance))
-	bucket.updated.Store(time.Now().UnixNano())
-
-	return &bucket
+	return (&Bucket{}).Reset(maxBalance)
 }
 
 // approximate but fast
-func (t *Bucket) Allow(maxBalance, refillRate uint) bool {
+func (b *Bucket) Allow(maxBalance, refillRate uint) bool {
 	now := time.Now().UnixNano()
-	updated := t.updated.Load()
-	if now > updated && t.updated.CompareAndSwap(updated, now) {
+	updated := b.updated.Load()
+	if now > updated && b.updated.CompareAndSwap(updated, now) {
 		elapsed := float64(now-updated) / float64(time.Second)
 		add := int64(elapsed * float64(refillRate))
 		if add > 0 {
-			balance := t.balance.Add(add)
+			balance := b.balance.Add(add)
 			if balance > int64(maxBalance) {
-				t.balance.Store(int64(maxBalance))
+				b.balance.Store(int64(maxBalance))
 			}
 		}
 	}
 
-	if t.balance.Add(-1) < 0 {
-		t.balance.Add(1)
+	if b.balance.Add(-1) < 0 {
+		b.balance.Add(1)
 		return false
 	}
 
 	return true
+}
+
+func (b *Bucket) Reset(maxBalance uint) *Bucket {
+	b.balance.Store(int64(maxBalance))
+	b.updated.Store(time.Now().UnixNano())
+
+	return b
 }
