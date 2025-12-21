@@ -2,18 +2,18 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.6.1-blue)
+![Version](https://img.shields.io/badge/version-v0.7.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
 ---
 
 # Meds: net healing  
-> A modern, lock-free firewall powered by NFQUEUE and Go
+> High-performance firewall powered by NFQUEUE and Go
 
 It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering to block malicious or unwanted traffic in real-time.
 
-*Meds — "net healing" firewall designed to cure your network from malicious traffic.*
+*Designed to cure your network from malicious traffic.*
 
 ---
 
@@ -49,33 +49,33 @@ sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
 ./meds -help
 Usage of ./meds:
   -api-addr string
-        api server address (default ":8000")
+    	api server address (default ":8000")
   -db-path string
-        path to database file (default "meds.db")
+    	path to database file (default "meds.db")
   -log-level string
-        zerolog level (default "info")
+    	zerolog level (default "info")
   -logger-queue-len uint
-        logger queue length (all workers) (default 2048)
+    	logger queue length (all workers) (default 2048)
   -loggers-count uint
-        logger workers count (default 3)
+    	logger workers count (default 3)
   -rate-limiter-burst uint
-        max packets at once (per ip) (default 1500)
+    	max packets at once (per ip) (default 1500)
   -rate-limiter-cache-size uint
-        rate limiter cache size (all buckets) (default 100000)
+    	rate limiter cache size (all buckets) (default 100000)
   -rate-limiter-cache-ttl duration
-        rate limiter cache ttl (per bucket) (default 3m0s)
+    	rate limiter cache ttl (per bucket) (default 3m0s)
   -rate-limiter-rate uint
-        max packets per second (per ip) (default 3000)
+    	max packets per second (per ip) (default 3000)
   -reader-queue-len uint
-        nfqueue queue length (per reader) (default 4096)
+    	nfqueue queue length (per reader) (default 4096)
   -readers-count uint
-        nfqueue readers count (default 12)
+    	nfqueue readers count (default 12)
   -update-interval duration
-        update frequency (default 4h0m0s)
+    	update frequency (default 4h0m0s)
   -update-timeout duration
-        update timeout (per filter) (default 10s)
+    	update timeout (per filter) (default 1m0s)
   -workers-count uint
-        nfqueue workers count (per reader) (default 1)
+    	nfqueue workers count (per reader) (default 1)
 ```
 
 ### Prometheus metrics  
@@ -114,7 +114,8 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   Meds itself does not use any mutexes — all filtering, counters, and rate-limiters use atomic operations.  
 
 - **Blacklist-based filtering**  
-  - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)  
+  - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)
+  - ASN blacklists: [Spamhaus ASN DROP](https://www.spamhaus.org/drop/asndrop.json) using [IPLocate.io](https://iplocate.io/) for IP-to-ASN mapping
   - Domain blacklists: [StevenBlack hosts](https://github.com/StevenBlack/hosts/), [SomeoneWhoCares hosts](https://someonewhocares.org/hosts/)
 
 - **TLS SNI & JA3 filtering**  
@@ -144,7 +145,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   Uses [radix tree](https://github.com/armon/go-radix) and [bart](https://github.com/gaissmai/bart) for IP/domain matching at scale.
 
 - **Extensible design**  
-  Modular architecture allows adding new filters (GeoIP, ASN, etc).
+  Modular architecture allows adding new filters.
 
 ---
 
@@ -154,7 +155,9 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
                      ↳ Global IP Filters (white/black lists)
                      ↳ Global Domain Filters (white/black lists)
                      ↳ Rate Limiter (per source IP)
-                     ↳ IP / Domain Filters
+                     ↳ IP Filters
+                     ↳ ASN Filters
+                     ↳ Domain Filters
                      ↳ TLS Filters (SNI / JA3)
                      ↳ Decision: ACCEPT / DROP
 ```
@@ -167,7 +170,9 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
    - **Global IP Filters** – checks against white/black lists
    - **Global Domain Filters** – checks against white/black lists
    - **Rate Limiter** – limits packet rate per source IP
-   - **IP / Domain Filters** – per-packet filtering rules
+   - **IP Filters** – per source IP filtering rules
+   - **ASN Filters** — resolves source IP to ASN and checks against database
+   - **Domain Filters** — per domain filtering rules
    - **TLS Filters** – SNI and JA3 fingerprint checks
 
 3. **Decision engine**  
@@ -176,7 +181,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 4. **Metrics & logging**  
    Every decision is counted and exported for monitoring and alerting.  
-   Metrics are Prometheus-compatible and can be visualized in Grafana.    
+   Metrics are Prometheus-compatible and can be visualized in Grafana.  
    All events are asynchronously logged to minimize packet processing latency.  
 
 ---
@@ -184,16 +189,20 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 ## 📊 Example Metrics (Prometheus)
 
 ```text
-# Total number of accepted packets
-meds_core_packets_accepted_total{filter="empty",reason="default"} 2165
-meds_core_packets_accepted_total{filter="ip",reason="whitelisted"} 102
+# HELP meds_core_packets_accepted_total Total number of accepted packets
+# TYPE meds_core_packets_accepted_total counter
+meds_core_packets_accepted_total{filter="empty",reason="default"} 21766
+meds_core_packets_accepted_total{filter="ip",reason="whitelisted"} 116
 
-# Total number of dropped packets
-meds_core_packets_dropped_total{filter="domain",reason="StevenBlack"} 3
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 167
+# HELP meds_core_packets_dropped_total Total number of dropped packets
+# TYPE meds_core_packets_dropped_total counter
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 12
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 1636
+meds_core_packets_dropped_total{filter="rate",reason="Limiter"} 6
 
-# Total number of processed packets
-meds_core_packets_processed_total 2437
+# HELP meds_core_packets_processed_total Total number of processed packets
+# TYPE meds_core_packets_processed_total counter
+meds_core_packets_processed_total 23536
 ```
 
 ---

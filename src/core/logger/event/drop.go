@@ -1,6 +1,7 @@
 package event
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -45,6 +46,10 @@ func (e Drop) Send(logger *zerolog.Logger) {
 			}
 		case filter.FilterTypeDomain:
 			target = strings.Join(e.Packet.GetDomains(), ",")
+		case filter.FilterTypeASN:
+			if asn, ok := e.Packet.GetASN(); ok {
+				target = strconv.FormatUint(uint64(asn), 10)
+			}
 		case filter.FilterTypeJA3:
 			target, _ = e.Packet.GetJA3()
 		}

@@ -3,6 +3,7 @@ package types
 import (
 	"net/netip"
 
+	"github.com/gaissmai/bart"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/open-ch/ja3"
@@ -12,6 +13,7 @@ import (
 
 type Packet struct {
 	packet     gopacket.Packet
+	asn        uint32
 	ja3        *ja3.JA3
 	domains    []string
 	revDomains []string
@@ -70,6 +72,29 @@ func (p *Packet) GetReversedDomains() []string {
 	p.revDomains = revDomains
 
 	return p.revDomains
+}
+
+// WARNING: don't forget to call SetASN() first
+func (p *Packet) GetASN() (uint32, bool) {
+	return p.asn, p.asn > 0
+}
+
+func (p *Packet) SetASN(ipToASN *bart.Table[uint32]) {
+	if _, ok := p.GetASN(); ok {
+		return
+	}
+
+	srcIP, ok := p.GetSrcIP()
+	if !ok {
+		return
+	}
+
+	asn, ok := ipToASN.Lookup(srcIP)
+	if !ok {
+		return
+	}
+
+	p.asn = asn
 }
 
 func (p *Packet) GetSNI() (string, bool) {

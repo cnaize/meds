@@ -21,6 +21,7 @@ import (
 	"github.com/cnaize/meds/src/server"
 	"github.com/cnaize/meds/src/types"
 
+	asnfilter "github.com/cnaize/meds/src/core/filter/asn"
 	domainfilter "github.com/cnaize/meds/src/core/filter/domain"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
 	ja3filter "github.com/cnaize/meds/src/core/filter/ja3"
@@ -38,7 +39,7 @@ func main() {
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(max(1, runtime.GOMAXPROCS(0)/4)), "logger workers count")
 	flag.UintVar(&cfg.ReaderQLen, "reader-queue-len", 4096, "nfqueue queue length (per reader)")
 	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
-	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", 10*time.Second, "update timeout (per filter)")
+	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
 	flag.UintVar(&cfg.LimiterRefillRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
 	flag.UintVar(&cfg.LimiterMaxBalance, "rate-limiter-burst", 1500, "max packets at once (per ip)")
@@ -254,13 +255,17 @@ func prefillWhiteList(ctx context.Context, db *database.Database, subnetWhiteLis
 }
 
 func newFilters(cfg config.Config, logger *logger.Logger) []filter.Filter {
+	// meta filters
+	ipToASN := asnfilter.NewIPLocate([]string{
+		"https://github.com/iplocate/ip-address-databases/raw/refs/heads/main/ip-to-asn/ip-to-asn.csv.zip",
+	}, logger)
+
 	return []filter.Filter{
 		// rate filter
 		ratefilter.NewLimiter(cfg.LimiterMaxBalance, cfg.LimiterRefillRate, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
 		// ip filters
 		ipfilter.NewFireHOL([]string{
 			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
-			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset",
 		}, logger),
 		ipfilter.NewSpamhaus([]string{
 			"https://www.spamhaus.org/drop/drop.txt",
@@ -268,6 +273,11 @@ func newFilters(cfg config.Config, logger *logger.Logger) []filter.Filter {
 		ipfilter.NewAbuse([]string{
 			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
 		}, logger),
+		// asn filters
+		ipToASN,
+		asnfilter.NewSpamhaus([]string{
+			"https://www.spamhaus.org/drop/asndrop.json",
+		}, logger, ipToASN),
 		// domain filters
 		domainfilter.NewStevenBlack([]string{
 			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
