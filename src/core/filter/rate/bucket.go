@@ -10,21 +10,22 @@ type Bucket struct {
 	updated atomic.Int64
 }
 
-func NewBucket(maxBalance uint) *Bucket {
-	return (&Bucket{}).Reset(maxBalance)
+func NewBucket(burst uint) *Bucket {
+	return (&Bucket{}).Reset(burst)
 }
 
 // approximate but fast
-func (b *Bucket) Allow(maxBalance, refillRate uint) bool {
+func (b *Bucket) Allow(rate, burst uint) bool {
 	now := time.Now().UnixNano()
 	updated := b.updated.Load()
-	if now > updated && b.updated.CompareAndSwap(updated, now) {
-		elapsed := float64(now-updated) / float64(time.Second)
-		add := int64(elapsed * float64(refillRate))
-		if add > 0 {
-			balance := b.balance.Add(add)
-			if balance > int64(maxBalance) {
-				b.balance.Store(int64(maxBalance))
+	elapsed := now - updated
+
+	add := (elapsed * int64(rate)) / int64(time.Second)
+	if add > 0 {
+		elapsed = (add * int64(time.Second)) / int64(rate)
+		if b.updated.CompareAndSwap(updated, updated+elapsed) {
+			if b.balance.Add(add) > int64(burst) {
+				b.balance.Store(int64(burst))
 			}
 		}
 	}
@@ -37,8 +38,8 @@ func (b *Bucket) Allow(maxBalance, refillRate uint) bool {
 	return true
 }
 
-func (b *Bucket) Reset(maxBalance uint) *Bucket {
-	b.balance.Store(int64(maxBalance))
+func (b *Bucket) Reset(burst uint) *Bucket {
+	b.balance.Store(int64(burst))
 	b.updated.Store(time.Now().UnixNano())
 
 	return b

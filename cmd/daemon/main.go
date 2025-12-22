@@ -41,8 +41,8 @@ func main() {
 	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
-	flag.UintVar(&cfg.LimiterRefillRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
-	flag.UintVar(&cfg.LimiterMaxBalance, "rate-limiter-burst", 1500, "max packets at once (per ip)")
+	flag.UintVar(&cfg.LimiterRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
+	flag.UintVar(&cfg.LimiterBurst, "rate-limiter-burst", 1500, "max packets at once (per ip)")
 	flag.UintVar(&cfg.LimiterCacheSize, "rate-limiter-cache-size", 100_000, "rate limiter cache size (all buckets)")
 	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-cache-ttl", 3*time.Minute, "rate limiter cache ttl (per bucket)")
 	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
@@ -262,7 +262,7 @@ func newFilters(cfg config.Config, logger *logger.Logger) []filter.Filter {
 
 	return []filter.Filter{
 		// rate filter
-		ratefilter.NewLimiter(cfg.LimiterMaxBalance, cfg.LimiterRefillRate, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
+		ratefilter.NewLimiter(cfg.LimiterRate, cfg.LimiterBurst, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
 		// ip filters
 		ipfilter.NewFireHOL([]string{
 			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",

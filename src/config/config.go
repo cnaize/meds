@@ -21,8 +21,8 @@ type Config struct {
 	Password      string
 	APIServerAddr string
 	// rate limiter
-	LimiterMaxBalance uint
-	LimiterRefillRate uint
-	LimiterCacheSize  uint
-	LimiterBucketTTL  time.Duration
+	LimiterRate      uint
+	LimiterBurst     uint
+	LimiterCacheSize uint
+	LimiterBucketTTL time.Duration
 }

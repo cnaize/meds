@@ -18,10 +18,10 @@ import (
 var _ filter.Filter = (*Limiter)(nil)
 
 type Limiter struct {
-	maxBalance uint
-	refillRate uint
-	cacheSize  uint
-	bucketTTL  time.Duration
+	rate      uint
+	burst     uint
+	cacheSize uint
+	bucketTTL time.Duration
 
 	logger *logger.Logger
 
@@ -29,16 +29,16 @@ type Limiter struct {
 	bpool sync.Pool
 }
 
-func NewLimiter(maxBalance, refillRate, cacheSize uint, bucketTTL time.Duration, logger *logger.Logger) *Limiter {
+func NewLimiter(rate, burst, cacheSize uint, bucketTTL time.Duration, logger *logger.Logger) *Limiter {
 	return &Limiter{
-		maxBalance: maxBalance,
-		refillRate: refillRate,
-		cacheSize:  cacheSize,
-		bucketTTL:  bucketTTL,
-		logger:     logger,
+		rate:      rate,
+		burst:     burst,
+		cacheSize: cacheSize,
+		bucketTTL: bucketTTL,
+		logger:    logger,
 		bpool: sync.Pool{
 			New: func() any {
-				return NewBucket(maxBalance)
+				return NewBucket(burst)
 			},
 		},
 	}
@@ -55,9 +55,8 @@ func (f *Limiter) Type() filter.FilterType {
 func (f *Limiter) Load(ctx context.Context) error {
 	cache, err := otter.New(
 		&otter.Options[netip.Addr, *Bucket]{
-			MaximumSize:       int(f.cacheSize),
-			ExpiryCalculator:  otter.ExpiryAccessing[netip.Addr, *Bucket](f.bucketTTL),
-			RefreshCalculator: otter.RefreshWriting[netip.Addr, *Bucket](time.Second),
+			MaximumSize:      int(f.cacheSize),
+			ExpiryCalculator: otter.ExpiryAccessing[netip.Addr, *Bucket](f.bucketTTL),
 			OnDeletion: func(e otter.DeletionEvent[netip.Addr, *Bucket]) {
 				f.bpool.Put(e.Value)
 			},
@@ -86,7 +85,7 @@ func (f *Limiter) Check(packet *types.Packet) bool {
 	bucket, err := f.cache.Get(context.Background(), srcIP,
 		otter.LoaderFunc[netip.Addr, *Bucket](
 			func(ctx context.Context, key netip.Addr) (*Bucket, error) {
-				return f.bpool.Get().(*Bucket).Reset(f.maxBalance), nil
+				return f.bpool.Get().(*Bucket).Reset(f.burst), nil
 			},
 		),
 	)
@@ -95,7 +94,7 @@ func (f *Limiter) Check(packet *types.Packet) bool {
 		return true
 	}
 
-	return bucket.Allow(f.maxBalance, f.refillRate)
+	return bucket.Allow(f.rate, f.burst)
 }
 
 func (f *Limiter) Update(ctx context.Context) error {
