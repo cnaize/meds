@@ -7,8 +7,12 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/core/logger/event"
+	"github.com/cnaize/meds/src/core/metrics"
 	"github.com/cnaize/meds/src/types"
 )
 
@@ -91,7 +95,10 @@ func (q *Queue) Run(ctx context.Context) error {
 		for j := i * int(q.wcount); j < i*int(q.wcount)+int(q.wcount); j++ {
 			go func() {
 				if err := q.workers[j].Run(ctx, reader.nfq, reader.wch); err != nil {
-					q.logger.Raw().Err(err).Msg("worker run")
+					msg := "worker run"
+
+					metrics.Get().ErrorsTotal.WithLabelValues(msg).Inc()
+					q.logger.Log(event.NewError(zerolog.ErrorLevel, msg, err))
 				}
 			}()
 		}
@@ -119,12 +126,15 @@ func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 				defer cancel()
 
 				if err := filter.Update(ctx); err != nil {
+					msg := "filter update failed"
+
+					metrics.Get().ErrorsTotal.WithLabelValues(msg).Inc()
 					q.logger.Raw().
 						Error().
 						Err(err).
 						Str("name", filter.Name()).
 						Str("type", string(filter.Type())).
-						Msg("filter update failed")
+						Msg(msg)
 				}
 			}()
 		}

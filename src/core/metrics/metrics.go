@@ -9,6 +9,7 @@ type Metrics struct {
 	PacketsAcceptedTotal  *prometheus.CounterVec
 	PacketsDroppedTotal   *prometheus.CounterVec
 	PacketsProcessedTotal prometheus.Counter
+	ErrorsTotal           *prometheus.CounterVec
 	RateLimiterCacheStats *stats.Counter
 }
 
@@ -42,6 +43,15 @@ func init() {
 				Help:      "Total number of processed packets",
 			},
 		),
+		ErrorsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: "meds",
+				Subsystem: "core",
+				Name:      "errors_total",
+				Help:      "Total number of errors",
+			},
+			[]string{"error"},
+		),
 		RateLimiterCacheStats: stats.NewCounter(),
 	}
 }
@@ -54,4 +64,5 @@ func (m *Metrics) Register(reg *prometheus.Registry) {
 	reg.MustRegister(m.PacketsAcceptedTotal)
 	reg.MustRegister(m.PacketsDroppedTotal)
 	reg.MustRegister(m.PacketsProcessedTotal)
+	reg.MustRegister(m.ErrorsTotal)
 }
