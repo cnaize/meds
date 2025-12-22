@@ -37,10 +37,10 @@ func (f *Base) Load(ctx context.Context) error {
 }
 
 func (f *Base) Check(packet *types.Packet) bool {
-	// set asn
+	// save to cache
 	packet.SetASN(f.ipToASN.ipToASN.Load())
 
-	// get asn
+	// get from cache
 	asn, ok := packet.GetASN()
 	if !ok {
 		return true
@@ -48,5 +48,5 @@ func (f *Base) Check(packet *types.Packet) bool {
 
 	// check asn
 	list := *f.blacklist.Load()
-	return !list[asn]
+	return !list[asn.ASN]
 }

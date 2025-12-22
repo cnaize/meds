@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/appleboy/graceful"
@@ -41,6 +42,7 @@ func main() {
 	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
+	flag.StringVar(&cfg.GeoBlackList, "block-countries", "", `countries to block (example: "FR,DE")`)
 	flag.UintVar(&cfg.LimiterRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
 	flag.UintVar(&cfg.LimiterBurst, "rate-limiter-burst", 1500, "max packets at once (per ip)")
 	flag.UintVar(&cfg.LimiterCacheSize, "rate-limiter-cache-size", 100_000, "rate limiter cache size (all buckets)")
@@ -93,7 +95,7 @@ func main() {
 	}
 
 	// create filters
-	filters := newFilters(cfg, logger)
+	filters := newFilters(cfg, logger, strings.Split(strings.TrimSpace(cfg.GeoBlackList), ","))
 
 	// create queue
 	q := core.NewQueue(
@@ -254,11 +256,10 @@ func prefillWhiteList(ctx context.Context, db *database.Database, subnetWhiteLis
 	return nil
 }
 
-func newFilters(cfg config.Config, logger *logger.Logger) []filter.Filter {
-	// meta filters
-	ipToASN := asnfilter.NewIPLocate([]string{
+func newFilters(cfg config.Config, logger *logger.Logger, geoBlackList []string) []filter.Filter {
+	ipLocate := asnfilter.NewIPLocate([]string{
 		"https://github.com/iplocate/ip-address-databases/raw/refs/heads/main/ip-to-asn/ip-to-asn.csv.zip",
-	}, logger)
+	}, logger, geoBlackList)
 
 	return []filter.Filter{
 		// rate filter
@@ -273,11 +274,12 @@ func newFilters(cfg config.Config, logger *logger.Logger) []filter.Filter {
 		ipfilter.NewAbuse([]string{
 			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
 		}, logger),
+		// geo filters
+		ipLocate,
 		// asn filters
-		ipToASN,
 		asnfilter.NewSpamhaus([]string{
 			"https://www.spamhaus.org/drop/asndrop.json",
-		}, logger, ipToASN),
+		}, logger, ipLocate),
 		// domain filters
 		domainfilter.NewStevenBlack([]string{
 			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",

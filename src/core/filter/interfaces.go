@@ -11,6 +11,7 @@ type FilterType string
 const (
 	FilterTypeEmpty  FilterType = "empty"
 	FilterTypeIP     FilterType = "ip"
+	FilterTypeGeo    FilterType = "geo"
 	FilterTypeASN    FilterType = "asn"
 	FilterTypeJA3    FilterType = "ja3"
 	FilterTypeMeta   FilterType = "meta"

@@ -13,7 +13,7 @@ import (
 
 type Packet struct {
 	packet     gopacket.Packet
-	asn        uint32
+	asn        ASN
 	ja3        *ja3.JA3
 	domains    []string
 	revDomains []string
@@ -75,11 +75,12 @@ func (p *Packet) GetReversedDomains() []string {
 }
 
 // WARNING: don't forget to call SetASN() first
-func (p *Packet) GetASN() (uint32, bool) {
-	return p.asn, p.asn > 0
+func (p *Packet) GetASN() (ASN, bool) {
+	return p.asn, p.asn.ASN > 0
 }
 
-func (p *Packet) SetASN(ipToASN *bart.Table[uint32]) {
+func (p *Packet) SetASN(ipToASN *bart.Table[ASN]) {
+	// get from cache
 	if _, ok := p.GetASN(); ok {
 		return
 	}
@@ -94,6 +95,7 @@ func (p *Packet) SetASN(ipToASN *bart.Table[uint32]) {
 		return
 	}
 
+	// save to cache
 	p.asn = asn
 }
 

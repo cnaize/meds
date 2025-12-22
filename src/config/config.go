@@ -13,9 +13,11 @@ type Config struct {
 	LoggersCount uint
 	ReaderQLen   uint
 	LoggerQLen   uint
-	// filter
+	// filters
 	UpdateTimeout  time.Duration
 	UpdateInterval time.Duration
+	// geo
+	GeoBlackList string
 	// api server
 	Username      string
 	Password      string

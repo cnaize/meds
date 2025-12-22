@@ -60,7 +60,7 @@ info:
     name: MIT
     url: https://opensource.org/licenses/MIT
   title: 'Meds: net healing'
-  version: v0.7.0
+  version: v0.8.0
 paths:
   /v1/blacklist/domains:
     delete:

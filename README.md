@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.7.0-blue)
+![Version](https://img.shields.io/badge/version-v0.8.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -50,6 +50,8 @@ sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
 Usage of ./meds:
   -api-addr string
     	api server address (default ":8000")
+  -block-countries string
+    	countries to block (example: "FR,DE")
   -db-path string
     	path to database file (default "meds.db")
   -log-level string
@@ -102,6 +104,9 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 - **NFQUEUE-based packet interception**  
   Uses Linux Netfilter queues to copy inbound packets into user space with minimal overhead.
 
+- **Lock-free core**  
+  Meds itself does not use any mutexes — all filtering, counters, and rate-limiters use atomic operations.
+
 - **Decoupled reader / worker / logger model**  
   - Readers drain NFQUEUE as fast as possible
   - Workers perform CPU-intensive filtering
@@ -110,24 +115,29 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 - **Fast packet parsing with [gopacket](https://github.com/google/gopacket)**  
   Parses traffic efficiently (`lazy` and `no copy` modes enabled).
 
-- **Lock-free core**  
-  Meds itself does not use any mutexes — all filtering, counters, and rate-limiters use atomic operations.  
+- **Efficient lookups**  
+  Uses [radix tree](https://github.com/armon/go-radix) and [bart](https://github.com/gaissmai/bart) for IP/domain matching at scale.
+
+- **Rate Limiting per IP**  
+  Uses token bucket algorithm to limit burst and sustained traffic per source IP.  
+  Protects against high-frequency floods (SYN, DNS, ICMP, or generic packet floods).
 
 - **Blacklist-based filtering**  
   - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)
   - ASN blacklists: [Spamhaus ASN DROP](https://www.spamhaus.org/drop/asndrop.json) using [IPLocate.io](https://iplocate.io/) for IP-to-ASN mapping
   - Domain blacklists: [StevenBlack hosts](https://github.com/StevenBlack/hosts/), [SomeoneWhoCares hosts](https://someonewhocares.org/hosts/)
 
+- **ASN-based Geo-blocking**  
+  Efficiently blocks traffic from specific countries using ASN metadata from [IPLocate.io](https://iplocate.io/):  
+  - Lightweight alternative to heavy GeoIP databases
+  - Configurable via `-block-countries` flag (e.g., `FR,DE`)
+
 - **TLS SNI & JA3 filtering**  
   Extracts and inspects TLS ClientHello data directly from TCP payload before handshake completion:
   - Filters by SNI (domain in TLS handshake)  
-  - Filter by JA3 fingerprint using the [Abuse.ch SSLBL JA3 database](https://sslbl.abuse.ch/ja3-fingerprints/)
+  - Filters by JA3 fingerprint using the [Abuse.ch SSLBL JA3 database](https://sslbl.abuse.ch/ja3-fingerprints/)
 
   Enables real-time blocking of malicious TLS clients such as malware beacons, scanners, or C2 frameworks.
-
-- **Rate Limiting per IP**  
-  Uses token bucket algorithm to limit burst and sustained traffic per source IP.  
-  Protects against high-frequency floods (SYN, DNS, ICMP, or generic packet floods).
 
 - **HTTP API for runtime configuration**  
   Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP/Domain entries in global white/black lists.  
@@ -138,11 +148,9 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   - Total packets processed
   - Dropped packets (with reasons)
   - Accepted packets (with reasons)
+  - Internal errors (with types)
 
   Metrics are available at `/metrics` via the built-in API server, compatible with Prometheus scrape targets.
-
-- **Efficient lookups**  
-  Uses [radix tree](https://github.com/armon/go-radix) and [bart](https://github.com/gaissmai/bart) for IP/domain matching at scale.
 
 - **Extensible design**  
   Modular architecture allows adding new filters.
@@ -156,6 +164,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
                      ↳ Global Domain Filters (white/black lists)
                      ↳ Rate Limiter (per source IP)
                      ↳ IP Filters
+                     ↳ Geo Filters
                      ↳ ASN Filters
                      ↳ Domain Filters
                      ↳ TLS Filters (SNI / JA3)
@@ -167,13 +176,14 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 2. **Classification pipeline**  
    Packets are processed according to the following pipeline:
-   - **Global IP Filters** – checks against white/black lists
-   - **Global Domain Filters** – checks against white/black lists
-   - **Rate Limiter** – limits packet rate per source IP
-   - **IP Filters** – per source IP filtering rules
-   - **ASN Filters** — resolves source IP to ASN and checks against database
+   - **Global IP Filters** — checks against white/black lists
+   - **Global Domain Filters** — checks against white/black lists
+   - **Rate Limiter** — limits packet rate per source IP
+   - **IP Filters** — per source IP filtering rules
+   - **Geo Filters** — country-based checks using ASN metadata
+   - **ASN Filters** — reputation checks against ASN blacklist
    - **Domain Filters** — per domain filtering rules
-   - **TLS Filters** – SNI and JA3 fingerprint checks
+   - **TLS Filters** — SNI and JA3 fingerprint checks
 
 3. **Decision engine**  
    - **ACCEPT** → packet is safe, passed to kernel stack  
