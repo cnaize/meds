@@ -3,7 +3,6 @@ package types
 import (
 	"net/netip"
 
-	"github.com/gaissmai/bart"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/open-ch/ja3"
@@ -74,29 +73,27 @@ func (p *Packet) GetReversedDomains() []string {
 	return p.revDomains
 }
 
-// WARNING: don't forget to call SetASN() first
-func (p *Packet) GetASN() (ASN, bool) {
-	return p.asn, p.asn.ASN > 0
-}
-
-func (p *Packet) SetASN(ipToASN *bart.Table[ASN]) {
+// NOTE: pass nil as ASNList to get ASN from cache
+func (p *Packet) GetASN(asnlist *ASNList) (ASN, bool) {
 	// get from cache
-	if _, ok := p.GetASN(); ok {
-		return
+	if asnlist == nil || p.asn.ASN > 0 {
+		return p.asn, p.asn.ASN > 0
 	}
 
 	srcIP, ok := p.GetSrcIP()
 	if !ok {
-		return
+		return ASN{}, false
 	}
 
-	asn, ok := ipToASN.Lookup(srcIP)
+	asn, ok := asnlist.Load().Lookup(srcIP)
 	if !ok {
-		return
+		return ASN{}, false
 	}
 
 	// save to cache
 	p.asn = asn
+
+	return p.asn, true
 }
 
 func (p *Packet) GetSNI() (string, bool) {

@@ -1,21 +1,32 @@
 -- name: GetAllBlackListSubnets :many
-SELECT * FROM sn_blacklist;
+SELECT * FROM subnet_blacklist;
 
 -- name: UpsertBlackListSubnet :exec
-INSERT INTO sn_blacklist (subnet)
+INSERT INTO subnet_blacklist (subnet)
 VALUES (@subnet);
 
 -- name: RemoveBlackListSubnet :exec
-DELETE FROM sn_blacklist
+DELETE FROM subnet_blacklist
 WHERE subnet = @subnet;
 
 -- name: GetAllBlackListDomains :many
-SELECT * FROM dm_blacklist;
+SELECT * FROM domain_blacklist;
 
 -- name: UpsertBlackListDomain :exec
-INSERT INTO dm_blacklist (domain)
+INSERT INTO domain_blacklist (domain)
 VALUES (@domain);
 
 -- name: RemoveBlackListDomain :exec
-DELETE FROM dm_blacklist
+DELETE FROM domain_blacklist
 WHERE domain = @domain;
+
+-- name: GetAllBlackListCountries :many
+SELECT * FROM country_blacklist;
+
+-- name: UpsertBlackListCountry :exec
+INSERT INTO country_blacklist (country)
+VALUES (@country);
+
+-- name: RemoveBlackListCountry :exec
+DELETE FROM country_blacklist
+WHERE country = @country;

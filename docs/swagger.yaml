@@ -1,4 +1,9 @@
 definitions:
+  api.CheckCountryResp:
+    properties:
+      found:
+        type: boolean
+    type: object
   api.CheckDomainResp:
     properties:
       found:
@@ -9,9 +14,22 @@ definitions:
       found:
         type: boolean
     type: object
+  api.GetCountriesResp:
+    properties:
+      countries:
+        example:
+        - fr
+        - de
+        items:
+          type: string
+        type: array
+    type: object
   api.GetDomainsResp:
     properties:
       domains:
+        example:
+        - bad.com
+        - dead.com
         items:
           type: string
         type: array
@@ -19,6 +37,19 @@ definitions:
   api.GetSubnetsResp:
     properties:
       subnets:
+        example:
+        - 100.100.100.100/32
+        - 200.200.200.0/24
+        items:
+          type: string
+        type: array
+    type: object
+  api.RemoveCountriesReq:
+    properties:
+      countries:
+        example:
+        - fr
+        - de
         items:
           type: string
         type: array
@@ -26,6 +57,9 @@ definitions:
   api.RemoveDomainsReq:
     properties:
       domains:
+        example:
+        - bad.com
+        - dead.com
         items:
           type: string
         type: array
@@ -33,6 +67,19 @@ definitions:
   api.RemoveSubnetsReq:
     properties:
       subnets:
+        example:
+        - 100.100.100.100
+        - 200.200.200.0/24
+        items:
+          type: string
+        type: array
+    type: object
+  api.UpsertCountriesReq:
+    properties:
+      countries:
+        example:
+        - fr
+        - de
         items:
           type: string
         type: array
@@ -40,6 +87,9 @@ definitions:
   api.UpsertDomainsReq:
     properties:
       domains:
+        example:
+        - bad.com
+        - dead.com
         items:
           type: string
         type: array
@@ -47,6 +97,9 @@ definitions:
   api.UpsertSubnetsReq:
     properties:
       subnets:
+        example:
+        - 100.100.100.100
+        - 200.200.200.0/24
         items:
           type: string
         type: array
@@ -62,6 +115,84 @@ info:
   title: 'Meds: net healing'
   version: v0.8.0
 paths:
+  /v1/blacklist/countries:
+    delete:
+      consumes:
+      - application/json
+      description: remove countries from blacklist
+      parameters:
+      - description: countries to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveCountriesReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove blacklisted countries
+      tags:
+      - blacklist
+    get:
+      description: get all blacklisted countries
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetCountriesResp'
+      summary: Get blacklisted countries
+      tags:
+      - blacklist
+    post:
+      consumes:
+      - application/json
+      description: upsert countries to blacklist
+      parameters:
+      - description: countries to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertCountriesReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert blacklisted countries
+      tags:
+      - blacklist
+  /v1/blacklist/countries/{country}:
+    get:
+      description: check if a country is blacklisted
+      parameters:
+      - description: country to check
+        in: path
+        name: country
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckCountryResp'
+      summary: Check blacklisted country
+      tags:
+      - blacklist
   /v1/blacklist/domains:
     delete:
       consumes:

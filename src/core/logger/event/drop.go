@@ -45,11 +45,11 @@ func (e Drop) Send(logger *zerolog.Logger) {
 				target = srcIP.String()
 			}
 		case filter.FilterTypeGeo:
-			if asn, ok := e.Packet.GetASN(); ok {
+			if asn, ok := e.Packet.GetASN(nil); ok {
 				target = asn.Country
 			}
 		case filter.FilterTypeASN:
-			if asn, ok := e.Packet.GetASN(); ok {
+			if asn, ok := e.Packet.GetASN(nil); ok {
 				target = strconv.FormatUint(uint64(asn.ASN), 10)
 			}
 		case filter.FilterTypeDomain:

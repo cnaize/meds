@@ -10,7 +10,7 @@ import (
 )
 
 const getAllWhiteListDomains = `-- name: GetAllWhiteListDomains :many
-SELECT domain FROM dm_whitelist
+SELECT domain FROM domain_whitelist
 `
 
 func (q *Queries) GetAllWhiteListDomains(ctx context.Context, db DBTX) ([]string, error) {
@@ -37,7 +37,7 @@ func (q *Queries) GetAllWhiteListDomains(ctx context.Context, db DBTX) ([]string
 }
 
 const getAllWhiteListSubnets = `-- name: GetAllWhiteListSubnets :many
-SELECT subnet FROM sn_whitelist
+SELECT subnet FROM subnet_whitelist
 `
 
 func (q *Queries) GetAllWhiteListSubnets(ctx context.Context, db DBTX) ([]string, error) {
@@ -64,7 +64,7 @@ func (q *Queries) GetAllWhiteListSubnets(ctx context.Context, db DBTX) ([]string
 }
 
 const removeWhiteListDomain = `-- name: RemoveWhiteListDomain :exec
-DELETE FROM dm_whitelist
+DELETE FROM domain_whitelist
 WHERE domain = ?1
 `
 
@@ -74,7 +74,7 @@ func (q *Queries) RemoveWhiteListDomain(ctx context.Context, db DBTX, domain str
 }
 
 const removeWhiteListSubnet = `-- name: RemoveWhiteListSubnet :exec
-DELETE FROM sn_whitelist
+DELETE FROM subnet_whitelist
 WHERE subnet = ?1
 `
 
@@ -84,7 +84,7 @@ func (q *Queries) RemoveWhiteListSubnet(ctx context.Context, db DBTX, subnet str
 }
 
 const upsertWhiteListDomain = `-- name: UpsertWhiteListDomain :exec
-INSERT INTO dm_whitelist (domain)
+INSERT INTO domain_whitelist (domain)
 VALUES (?1)
 `
 
@@ -94,7 +94,7 @@ func (q *Queries) UpsertWhiteListDomain(ctx context.Context, db DBTX, domain str
 }
 
 const upsertWhiteListSubnet = `-- name: UpsertWhiteListSubnet :exec
-INSERT INTO sn_whitelist (subnet)
+INSERT INTO subnet_whitelist (subnet)
 VALUES (?1)
 `
 

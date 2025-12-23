@@ -36,7 +36,7 @@ func GetBlackListDomains(blacklist *types.DomainList, mu *sync.Mutex) func(*gin.
 }
 
 type GetDomainsResp struct {
-	Domains []string `json:"domains"`
+	Domains []string `json:"domains" example:"bad.com,dead.com"`
 }
 
 func domainListGetAll(list *types.DomainList, mu *sync.Mutex) func(*gin.Context) {
@@ -124,7 +124,7 @@ func UpsertBlackListDomains(blacklist *types.DomainList, mu *sync.Mutex, db *dat
 }
 
 type UpsertDomainsReq struct {
-	Domains []string `json:"domains"`
+	Domains []string `json:"domains" example:"bad.com,dead.com"`
 }
 
 func domainListUpsert(
@@ -192,7 +192,7 @@ func RemoveBlackListDomains(blacklist *types.DomainList, mu *sync.Mutex, db *dat
 }
 
 type RemoveDomainsReq struct {
-	Domains []string `json:"domains"`
+	Domains []string `json:"domains" example:"bad.com,dead.com"`
 }
 
 func domainListRemove(

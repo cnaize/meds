@@ -1,23 +1,29 @@
-CREATE TABLE IF NOT EXISTS sn_whitelist (
+CREATE TABLE IF NOT EXISTS subnet_whitelist (
     subnet TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_snwl_subnet ON sn_whitelist (subnet);
+CREATE INDEX IF NOT EXISTS idx_snwl_subnet ON subnet_whitelist (subnet);
 
-CREATE TABLE IF NOT EXISTS sn_blacklist (
+CREATE TABLE IF NOT EXISTS subnet_blacklist (
     subnet TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_snbl_subnet ON sn_blacklist (subnet);
+CREATE INDEX IF NOT EXISTS idx_snbl_subnet ON subnet_blacklist (subnet);
 
-CREATE TABLE IF NOT EXISTS dm_whitelist (
+CREATE TABLE IF NOT EXISTS domain_whitelist (
     domain TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_dmwl_domain ON dm_whitelist (domain);
+CREATE INDEX IF NOT EXISTS idx_dmwl_domain ON domain_whitelist (domain);
 
-CREATE TABLE IF NOT EXISTS dm_blacklist (
+CREATE TABLE IF NOT EXISTS domain_blacklist (
     domain TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_dmbl_domain ON dm_blacklist (domain);
+CREATE INDEX IF NOT EXISTS idx_dmbl_domain ON domain_blacklist (domain);
+
+CREATE TABLE IF NOT EXISTS country_blacklist (
+    country TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_crbl_country ON country_blacklist (country);

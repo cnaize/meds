@@ -22,6 +22,125 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/v1/blacklist/countries": {
+            "get": {
+                "description": "get all blacklisted countries",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Get blacklisted countries",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetCountriesResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert countries to blacklist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Upsert blacklisted countries",
+                "parameters": [
+                    {
+                        "description": "countries to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertCountriesReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove countries from blacklist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Remove blacklisted countries",
+                "parameters": [
+                    {
+                        "description": "countries to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveCountriesReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/blacklist/countries/{country}": {
+            "get": {
+                "description": "check if a country is blacklisted",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "blacklist"
+                ],
+                "summary": "Check blacklisted country",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "country to check",
+                        "name": "country",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckCountryResp"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/blacklist/domains": {
             "get": {
                 "description": "get all blacklisted domains",
@@ -506,6 +625,14 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "api.CheckCountryResp": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "boolean"
+                }
+            }
+        },
         "api.CheckDomainResp": {
             "type": "object",
             "properties": {
@@ -522,6 +649,21 @@ const docTemplate = `{
                 }
             }
         },
+        "api.GetCountriesResp": {
+            "type": "object",
+            "properties": {
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "fr",
+                        "de"
+                    ]
+                }
+            }
+        },
         "api.GetDomainsResp": {
             "type": "object",
             "properties": {
@@ -529,7 +671,11 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "bad.com",
+                        "dead.com"
+                    ]
                 }
             }
         },
@@ -540,7 +686,26 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "100.100.100.100/32",
+                        "200.200.200.0/24"
+                    ]
+                }
+            }
+        },
+        "api.RemoveCountriesReq": {
+            "type": "object",
+            "properties": {
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "fr",
+                        "de"
+                    ]
                 }
             }
         },
@@ -551,7 +716,11 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "bad.com",
+                        "dead.com"
+                    ]
                 }
             }
         },
@@ -562,7 +731,26 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "100.100.100.100",
+                        "200.200.200.0/24"
+                    ]
+                }
+            }
+        },
+        "api.UpsertCountriesReq": {
+            "type": "object",
+            "properties": {
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "fr",
+                        "de"
+                    ]
                 }
             }
         },
@@ -573,7 +761,11 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "bad.com",
+                        "dead.com"
+                    ]
                 }
             }
         },
@@ -584,7 +776,11 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "100.100.100.100",
+                        "200.200.200.0/24"
+                    ]
                 }
             }
         }

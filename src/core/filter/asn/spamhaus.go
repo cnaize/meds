@@ -11,6 +11,7 @@ import (
 	"github.com/cnaize/meds/lib/util"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/types"
 )
 
 var _ filter.Filter = (*Spamhaus)(nil)
@@ -19,9 +20,9 @@ type Spamhaus struct {
 	*Base
 }
 
-func NewSpamhaus(urls []string, logger *logger.Logger, ipToASN *IPLocate) *Spamhaus {
+func NewSpamhaus(urls []string, logger *logger.Logger, anslist *types.ASNList) *Spamhaus {
 	return &Spamhaus{
-		Base: NewBase(urls, logger, ipToASN),
+		Base: NewBase(urls, logger, anslist),
 	}
 }
 

@@ -27,11 +27,12 @@ func NewServer(
 	subnetBlackList *types.SubnetList,
 	domainWhiteList *types.DomainList,
 	domainBlackList *types.DomainList,
+	countryBlackList *types.CountryList,
 ) *Server {
 	r := gin.New()
 	r.Use(gin.BasicAuth(gin.Accounts{username: password}), gin.Recovery())
 
-	api.Register(r, db, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList)
+	api.Register(r, db, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, countryBlackList)
 
 	return &Server{
 		router: r,

@@ -1,10 +1,8 @@
-package asn
+package geo
 
 import (
 	"context"
-	"sync/atomic"
 
-	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/types"
@@ -15,24 +13,23 @@ type Base struct {
 	logger *logger.Logger
 
 	asnlist   *types.ASNList
-	blacklist atomic.Pointer[map[uint32]bool]
+	blacklist *types.CountryList
 }
 
-func NewBase(urls []string, logger *logger.Logger, asnlist *types.ASNList) *Base {
+func NewBase(urls []string, logger *logger.Logger, asnlist *types.ASNList, blacklist *types.CountryList) *Base {
 	return &Base{
-		urls:    urls,
-		logger:  logger,
-		asnlist: asnlist,
+		urls:      urls,
+		logger:    logger,
+		asnlist:   asnlist,
+		blacklist: blacklist,
 	}
 }
 
 func (f *Base) Type() filter.FilterType {
-	return filter.FilterTypeASN
+	return filter.FilterTypeGeo
 }
 
 func (f *Base) Load(ctx context.Context) error {
-	f.blacklist.Store(get.Ptr(make(map[uint32]bool)))
-
 	return nil
 }
 
@@ -42,6 +39,5 @@ func (f *Base) Check(packet *types.Packet) bool {
 		return true
 	}
 
-	list := *f.blacklist.Load()
-	return !list[asn.ASN]
+	return !f.blacklist.Lookup(asn.Country)
 }

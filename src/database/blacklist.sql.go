@@ -9,8 +9,35 @@ import (
 	"context"
 )
 
+const getAllBlackListCountries = `-- name: GetAllBlackListCountries :many
+SELECT country FROM country_blacklist
+`
+
+func (q *Queries) GetAllBlackListCountries(ctx context.Context, db DBTX) ([]string, error) {
+	rows, err := db.QueryContext(ctx, getAllBlackListCountries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var country string
+		if err := rows.Scan(&country); err != nil {
+			return nil, err
+		}
+		items = append(items, country)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllBlackListDomains = `-- name: GetAllBlackListDomains :many
-SELECT domain FROM dm_blacklist
+SELECT domain FROM domain_blacklist
 `
 
 func (q *Queries) GetAllBlackListDomains(ctx context.Context, db DBTX) ([]string, error) {
@@ -37,7 +64,7 @@ func (q *Queries) GetAllBlackListDomains(ctx context.Context, db DBTX) ([]string
 }
 
 const getAllBlackListSubnets = `-- name: GetAllBlackListSubnets :many
-SELECT subnet FROM sn_blacklist
+SELECT subnet FROM subnet_blacklist
 `
 
 func (q *Queries) GetAllBlackListSubnets(ctx context.Context, db DBTX) ([]string, error) {
@@ -63,8 +90,18 @@ func (q *Queries) GetAllBlackListSubnets(ctx context.Context, db DBTX) ([]string
 	return items, nil
 }
 
+const removeBlackListCountry = `-- name: RemoveBlackListCountry :exec
+DELETE FROM country_blacklist
+WHERE country = ?1
+`
+
+func (q *Queries) RemoveBlackListCountry(ctx context.Context, db DBTX, country string) error {
+	_, err := db.ExecContext(ctx, removeBlackListCountry, country)
+	return err
+}
+
 const removeBlackListDomain = `-- name: RemoveBlackListDomain :exec
-DELETE FROM dm_blacklist
+DELETE FROM domain_blacklist
 WHERE domain = ?1
 `
 
@@ -74,7 +111,7 @@ func (q *Queries) RemoveBlackListDomain(ctx context.Context, db DBTX, domain str
 }
 
 const removeBlackListSubnet = `-- name: RemoveBlackListSubnet :exec
-DELETE FROM sn_blacklist
+DELETE FROM subnet_blacklist
 WHERE subnet = ?1
 `
 
@@ -83,8 +120,18 @@ func (q *Queries) RemoveBlackListSubnet(ctx context.Context, db DBTX, subnet str
 	return err
 }
 
+const upsertBlackListCountry = `-- name: UpsertBlackListCountry :exec
+INSERT INTO country_blacklist (country)
+VALUES (?1)
+`
+
+func (q *Queries) UpsertBlackListCountry(ctx context.Context, db DBTX, country string) error {
+	_, err := db.ExecContext(ctx, upsertBlackListCountry, country)
+	return err
+}
+
 const upsertBlackListDomain = `-- name: UpsertBlackListDomain :exec
-INSERT INTO dm_blacklist (domain)
+INSERT INTO domain_blacklist (domain)
 VALUES (?1)
 `
 
@@ -94,7 +141,7 @@ func (q *Queries) UpsertBlackListDomain(ctx context.Context, db DBTX, domain str
 }
 
 const upsertBlackListSubnet = `-- name: UpsertBlackListSubnet :exec
-INSERT INTO sn_blacklist (subnet)
+INSERT INTO subnet_blacklist (subnet)
 VALUES (?1)
 `
 

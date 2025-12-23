@@ -28,10 +28,11 @@ import (
 
 // TODO: move out of global
 var (
-	subnetWhiteListMu sync.Mutex
-	subnetBlackListMu sync.Mutex
-	domainWhiteListMu sync.Mutex
-	domainBlackListMu sync.Mutex
+	subnetWhiteListMu  sync.Mutex
+	subnetBlackListMu  sync.Mutex
+	domainWhiteListMu  sync.Mutex
+	domainBlackListMu  sync.Mutex
+	countryBlackListMu sync.Mutex
 )
 
 func Register(
@@ -41,6 +42,7 @@ func Register(
 	subnetBlackList *types.SubnetList,
 	domainWhiteList *types.DomainList,
 	domainBlackList *types.DomainList,
+	countryBlackList *types.CountryList,
 ) {
 	// register prometheus metrics
 	reg := prometheus.NewRegistry()
@@ -81,4 +83,10 @@ func Register(
 	dmBlackList.GET("/:domain", CheckBlackListDomain(domainBlackList, &domainBlackListMu))
 	dmBlackList.POST("", UpsertBlackListDomains(domainBlackList, &domainBlackListMu, db))
 	dmBlackList.DELETE("", RemoveBlackListDomains(domainBlackList, &domainBlackListMu, db))
+	// register country blacklist
+	crBlackList := blacklist.Group("/countries")
+	crBlackList.GET("", GetBlackListCountries(countryBlackList, &countryBlackListMu))
+	crBlackList.GET("/:country", CheckBlackListCountry(countryBlackList, &countryBlackListMu))
+	crBlackList.POST("", UpsertBlackListCountries(countryBlackList, &countryBlackListMu, db))
+	crBlackList.DELETE("", RemoveBlackListCountries(countryBlackList, &countryBlackListMu, db))
 }

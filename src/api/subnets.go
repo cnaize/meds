@@ -37,7 +37,7 @@ func GetBlackListSubnets(blacklist *types.SubnetList, mu *sync.Mutex) func(*gin.
 }
 
 type GetSubnetsResp struct {
-	Subnets []string `json:"subnets"`
+	Subnets []string `json:"subnets" example:"100.100.100.100/32,200.200.200.0/24"`
 }
 
 func subnetListGetAll(list *types.SubnetList, mu *sync.Mutex) func(*gin.Context) {
@@ -138,7 +138,7 @@ func UpsertBlackListSubnets(blacklist *types.SubnetList, mu *sync.Mutex, db *dat
 }
 
 type UpsertSubnetsReq struct {
-	Subnets []string `json:"subnets"`
+	Subnets []string `json:"subnets" example:"100.100.100.100,200.200.200.0/24"`
 }
 
 func subnetListUpsert(
@@ -212,7 +212,7 @@ func RemoveBlackListSubnets(blacklist *types.SubnetList, mu *sync.Mutex, db *dat
 }
 
 type RemoveSubnetsReq struct {
-	Subnets []string `json:"subnets"`
+	Subnets []string `json:"subnets" example:"100.100.100.100,200.200.200.0/24"`
 }
 
 func subnetListRemove(

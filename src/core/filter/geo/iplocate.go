@@ -1,4 +1,4 @@
-package asn
+package geo
 
 import (
 	"archive/zip"
@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"github.com/gaissmai/bart"
 
@@ -23,28 +22,12 @@ import (
 var _ filter.Filter = (*IPLocate)(nil)
 
 type IPLocate struct {
-	urls   []string
-	logger *logger.Logger
-
-	ipToASN   atomic.Pointer[bart.Table[types.ASN]]
-	blacklist map[string]bool
+	*Base
 }
 
-func NewIPLocate(urls []string, logger *logger.Logger, geoBlackList []string) *IPLocate {
-	countries := make(map[string]bool, len(geoBlackList))
-	for _, country := range geoBlackList {
-		if len(country) < 1 {
-			continue
-		}
-
-		countries[strings.ToLower(country)] = true
-	}
-	logger.Raw().Info().Int("count", len(countries)).Msg("Block countries")
-
+func NewIPLocate(urls []string, logger *logger.Logger, asnlist *types.ASNList, blacklist *types.CountryList) *IPLocate {
 	return &IPLocate{
-		urls:      urls,
-		logger:    logger,
-		blacklist: countries,
+		Base: NewBase(urls, logger, asnlist, blacklist),
 	}
 }
 
@@ -52,33 +35,14 @@ func (f *IPLocate) Name() string {
 	return "IPLocate"
 }
 
-func (f *IPLocate) Type() filter.FilterType {
-	return filter.FilterTypeGeo
-}
-
 func (f *IPLocate) Load(ctx context.Context) error {
 	defer f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
 
-	f.ipToASN.Store(new(bart.Table[types.ASN]))
-
-	return nil
-}
-
-func (f *IPLocate) Check(packet *types.Packet) bool {
-	// save to cache
-	packet.SetASN(f.ipToASN.Load())
-
-	// get from cache
-	asn, ok := packet.GetASN()
-	if !ok {
-		return true
-	}
-
-	return !f.blacklist[asn.Country]
+	return f.Base.Load(ctx)
 }
 
 func (f *IPLocate) Update(ctx context.Context) error {
-	ipToASN := new(bart.Table[types.ASN])
+	asnlist := new(bart.Table[types.ASN])
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -138,7 +102,7 @@ func (f *IPLocate) Update(ctx context.Context) error {
 					continue
 				}
 
-				ipToASN.Insert(subnet, types.ASN{
+				asnlist.Insert(subnet, types.ASN{
 					ASN:     uint32(asn),
 					Country: strings.ToLower(fields[2]),
 				})
@@ -150,9 +114,9 @@ func (f *IPLocate) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", ipToASN.Size()).
+		Int("size", asnlist.Size()).
 		Msg("Filter updated")
-	f.ipToASN.Store(ipToASN)
+	f.asnlist.Store(asnlist)
 
 	return nil
 }

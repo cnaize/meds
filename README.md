@@ -50,8 +50,6 @@ sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
 Usage of ./meds:
   -api-addr string
     	api server address (default ":8000")
-  -block-countries string
-    	countries to block (example: "FR,DE")
   -db-path string
     	path to database file (default "meds.db")
   -log-level string
@@ -127,10 +125,10 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   - ASN blacklists: [Spamhaus ASN DROP](https://www.spamhaus.org/drop/asndrop.json) using [IPLocate.io](https://iplocate.io/) for IP-to-ASN mapping
   - Domain blacklists: [StevenBlack hosts](https://github.com/StevenBlack/hosts/), [SomeoneWhoCares hosts](https://someonewhocares.org/hosts/)
 
-- **ASN-based Geo-blocking**  
+- **Geo-blocking (ASN-based)**  
   Efficiently blocks traffic from specific countries using ASN metadata from [IPLocate.io](https://iplocate.io/):  
   - Lightweight alternative to heavy GeoIP databases
-  - Configurable via `-block-countries` flag (e.g., `FR,DE`)
+  - Dynamic configuration via API/Swagger
 
 - **TLS SNI & JA3 filtering**  
   Extracts and inspects TLS ClientHello data directly from TCP payload before handshake completion:
@@ -140,7 +138,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   Enables real-time blocking of malicious TLS clients such as malware beacons, scanners, or C2 frameworks.
 
 - **HTTP API for runtime configuration**  
-  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP/Domain entries in global white/black lists.  
+  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP, Domain, or Country entries in global white/black lists.  
   Auth via BasicAuth using `MEDS_USERNAME` / `MEDS_PASSWORD`.
 
 - **Prometheus metrics export**  

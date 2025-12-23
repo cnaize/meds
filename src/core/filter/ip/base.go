@@ -40,9 +40,6 @@ func (f *Base) Check(packet *types.Packet) bool {
 		return true
 	}
 
-	if f.blacklist.Load().Contains(srcIP) {
-		return false
-	}
-
-	return true
+	list := f.blacklist.Load()
+	return !list.Contains(srcIP)
 }

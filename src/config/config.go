@@ -16,8 +16,6 @@ type Config struct {
 	// filters
 	UpdateTimeout  time.Duration
 	UpdateInterval time.Duration
-	// geo
-	GeoBlackList string
 	// api server
 	Username      string
 	Password      string
