@@ -6,6 +6,11 @@ import (
 	"github.com/cnaize/meds/src/types"
 )
 
+const (
+	FilterNameWhiteList = "WhiteList"
+	FilterNameBlackList = "BlackList"
+)
+
 type FilterType string
 
 const (

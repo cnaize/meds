@@ -13,7 +13,6 @@ import (
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/core/logger/event"
 	"github.com/cnaize/meds/src/core/metrics"
-	"github.com/cnaize/meds/src/types"
 )
 
 type Queue struct {
@@ -27,38 +26,18 @@ type Queue struct {
 	workers []*Worker
 }
 
-func NewQueue(
-	qcount uint,
-	wcount uint,
-	qlen uint,
-	subnetWhiteList *types.SubnetList,
-	subnetBlackList *types.SubnetList,
-	domainWhiteList *types.DomainList,
-	domainBlackList *types.DomainList,
-	filters []filter.Filter,
-	logger *logger.Logger,
-) *Queue {
+func NewQueue(qcount uint, wcount uint, qlen uint, filters []filter.Filter, logger *logger.Logger) *Queue {
 	readers := make([]*Reader, 0, qcount)
 	workers := make([]*Worker, 0, qcount*wcount)
 	// WARNING: always balancing NFQUEUE from 0
 	for qnum := 0; qnum < int(qcount); qnum++ {
 		reader := NewReader(uint16(qnum), uint32(qlen), logger)
+		readers = append(readers, reader)
 
 		// workers per reader
 		for range wcount {
-			workers = append(workers,
-				NewWorker(
-					subnetWhiteList,
-					subnetBlackList,
-					domainWhiteList,
-					domainBlackList,
-					filters,
-					logger,
-				),
-			)
+			workers = append(workers, NewWorker(filters, logger))
 		}
-
-		readers = append(readers, reader)
 	}
 
 	return &Queue{

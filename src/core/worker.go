@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"net/netip"
 
 	"github.com/florianl/go-nfqueue/v2"
 	"github.com/rs/zerolog"
@@ -17,30 +16,14 @@ type Worker struct {
 	nfq *nfqueue.Nfqueue
 	rch <-chan nfqueue.Attribute
 
-	snWhiteList *types.SubnetList
-	snBlackList *types.SubnetList
-	dmWhiteList *types.DomainList
-	dmBlackList *types.DomainList
-
 	filters []filter.Filter
 	logger  *logger.Logger
 }
 
-func NewWorker(
-	subnetWhiteList *types.SubnetList,
-	subnetBlackList *types.SubnetList,
-	domainWhiteList *types.DomainList,
-	domainBlackList *types.DomainList,
-	filters []filter.Filter,
-	logger *logger.Logger,
-) *Worker {
+func NewWorker(filters []filter.Filter, logger *logger.Logger) *Worker {
 	return &Worker{
-		snWhiteList: subnetWhiteList,
-		snBlackList: subnetBlackList,
-		dmWhiteList: domainWhiteList,
-		dmBlackList: domainBlackList,
-		filters:     filters,
-		logger:      logger,
+		filters: filters,
+		logger:  logger,
 	}
 }
 
@@ -81,56 +64,31 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	}
 
 	// accept invalid packet
-	srcIP, ok := packet.GetSrcIP()
-	if !ok {
+	if _, ok := packet.GetSrcIP(); !ok {
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet skipped", "invalid packet", filter.FilterTypeIP, packet))
 
 		return
 	}
 
-	// pass through subnet whitelist
-	subnet := netip.PrefixFrom(srcIP, 32)
-	if w.snWhiteList.Lookup(subnet) {
-		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeIP, packet))
-
-		return
-	}
-
-	// pass through subnet blacklist
-	if w.snBlackList.Lookup(subnet) {
-		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
-		w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", "blacklisted", filter.FilterTypeIP, packet))
-
-		return
-	}
-
-	for _, domain := range packet.GetDomains() {
-		// pass through domain whitelist
-		if w.dmWhiteList.Lookup(domain) {
-			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-			w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "whitelisted", filter.FilterTypeDomain, packet))
-
-			return
-		}
-
-		// pass through domain blacklist
-		if w.dmBlackList.Lookup(domain) {
-			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
-			w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", "blacklisted", filter.FilterTypeDomain, packet))
-
-			return
-		}
-	}
-
 	// pass through filters
-	for _, filter := range w.filters {
-		if !filter.Check(packet) {
-			w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
-			w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", filter.Name(), filter.Type(), packet))
+	for _, checker := range w.filters {
+		if checker.Check(packet) {
+			// accept whitelists
+			if checker.Name() == filter.FilterNameWhiteList {
+				w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
+				w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", checker.Name(), checker.Type(), packet))
 
-			return
+				return
+			}
+		} else {
+			// otherwise drop
+			if checker.Name() != filter.FilterNameWhiteList {
+				w.nfq.SetVerdict(*a.PacketID, nfqueue.NfDrop)
+				w.logger.Log(event.NewDrop(zerolog.InfoLevel, "packet dropped", checker.Name(), checker.Type(), packet))
+
+				return
+			}
 		}
 	}
 

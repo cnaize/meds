@@ -94,20 +94,18 @@ func main() {
 	}
 
 	// create filters
-	filters := newFilters(cfg, logger, countryBlackList)
-
-	// create queue
-	q := core.NewQueue(
-		cfg.ReadersCount,
-		cfg.WorkersCount,
-		cfg.ReaderQLen,
+	filters := newFilters(
+		cfg,
+		logger,
 		subnetWhiteList,
 		subnetBlackList,
 		domainWhiteList,
 		domainBlackList,
-		filters,
-		logger,
+		countryBlackList,
 	)
+
+	// create queue
+	q := core.NewQueue(cfg.ReadersCount, cfg.WorkersCount, cfg.ReaderQLen, filters, logger)
 	if err := q.Load(mainCtx); err != nil {
 		logger.Raw().Fatal().Err(err).Msg("queue load failed")
 	}
@@ -266,13 +264,25 @@ func prefillWhiteList(ctx context.Context, db *database.Database, subnetWhiteLis
 	return nil
 }
 
-func newFilters(cfg config.Config, logger *logger.Logger, countryBlacklist *types.CountryList) []filter.Filter {
+func newFilters(
+	cfg config.Config,
+	logger *logger.Logger,
+	subnetWhiteList *types.SubnetList,
+	subnetBlackList *types.SubnetList,
+	domainWhiteList *types.DomainList,
+	domainBlackList *types.DomainList,
+	countryBlacklist *types.CountryList,
+) []filter.Filter {
 	// geofilter.IPLocate is responsible for the ASNList updates
 	asnList := types.NewASNList()
 
 	return []filter.Filter{
+		// ip whitelist
+		ipfilter.NewWhiteList(logger, subnetWhiteList),
 		// rate filter
 		ratefilter.NewLimiter(cfg.LimiterRate, cfg.LimiterBurst, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
+		// ip blacklist
+		ipfilter.NewBlackList(logger, subnetBlackList),
 		// ip filters
 		ipfilter.NewFireHOL([]string{
 			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
@@ -291,7 +301,11 @@ func newFilters(cfg config.Config, logger *logger.Logger, countryBlacklist *type
 		asnfilter.NewSpamhaus([]string{
 			"https://www.spamhaus.org/drop/asndrop.json",
 		}, logger, asnList),
-		// domain filters
+		// domain/sni whitelist
+		domainfilter.NewWhiteList(logger, domainWhiteList),
+		// domain/sni blacklist
+		domainfilter.NewBlackList(logger, domainBlackList),
+		// domain/sni filters
 		domainfilter.NewStevenBlack([]string{
 			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
 		}, logger),

@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.8.0-blue)
+![Version](https://img.shields.io/badge/version-v0.8.1-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -158,14 +158,16 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 ## 🔍 How It Works
 ```text
 [Kernel] → [NFQUEUE] → [Meds]
-                     ↳ Global IP Filters (white/black lists)
-                     ↳ Global Domain Filters (white/black lists)
+                     ↳ Global IP Whitelist
                      ↳ Rate Limiter (per source IP)
+                     ↳ Global IP Blacklist
                      ↳ IP Filters
                      ↳ Geo Filters
                      ↳ ASN Filters
-                     ↳ Domain Filters
-                     ↳ TLS Filters (SNI / JA3)
+                     ↳ Global Domain/SNI Whitelist
+                     ↳ Global Domain/SNI Blacklist
+                     ↳ Domain/SNI Filters
+                     ↳ TLS JA3 Filters
                      ↳ Decision: ACCEPT / DROP
 ```
 
@@ -174,14 +176,16 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 2. **Classification pipeline**  
    Packets are processed according to the following pipeline:
-   - **Global IP Filters** — checks against white/black lists
-   - **Global Domain Filters** — checks against white/black lists
-   - **Rate Limiter** — limits packet rate per source IP
-   - **IP Filters** — per source IP filtering rules
-   - **Geo Filters** — country-based checks using ASN metadata
-   - **ASN Filters** — reputation checks against ASN blacklist
-   - **Domain Filters** — per domain filtering rules
-   - **TLS Filters** — SNI and JA3 fingerprint checks
+   - **Global IP Whitelist** — immediate pass for trusted source IPs
+   - **Rate Limiter** — protects system resources by limiting packet rate per source IP
+   - **Global IP Blacklist** — immediate block for malicious source IPs
+   - **IP Filters** — applies granular IP-based filtering rules
+   - **Geo Filters** — filters traffic by country of origin using ASN metadata
+   - **ASN Filters** — checks Autonomous System reputation against blacklists
+   - **Global Domain/SNI Whitelist** — permits trusted domains extracted from DNS or TLS SNI
+   - **Global Domain/SNI Blacklist** — blocks malicious domains from DNS or TLS SNI
+   - **Domain/SNI Filters** — applies granular domain-based filtering rules
+   - **TLS JA3 Filters** — detects malicious clients via TLS fingerprinting
 
 3. **Decision engine**  
    - **ACCEPT** → packet is safe, passed to kernel stack  
@@ -199,18 +203,21 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 ```text
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="default"} 21766
-meds_core_packets_accepted_total{filter="ip",reason="whitelisted"} 116
+meds_core_packets_accepted_total{filter="domain",reason="WhiteList"} 1
+meds_core_packets_accepted_total{filter="empty",reason="decode failed"} 1
+meds_core_packets_accepted_total{filter="empty",reason="default"} 9785
+meds_core_packets_accepted_total{filter="ip",reason="WhiteList"} 57
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 12
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 1636
-meds_core_packets_dropped_total{filter="rate",reason="Limiter"} 6
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 73
+meds_core_packets_dropped_total{filter="geo",reason="IPLocate"} 2
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 386
+meds_core_packets_dropped_total{filter="rate",reason="Limiter"} 763
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 23536
+meds_core_packets_processed_total 11068
 ```
 
 ---
