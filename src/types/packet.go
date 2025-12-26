@@ -3,17 +3,23 @@ package types
 import (
 	"net/netip"
 
+	"github.com/dreadl0ck/ja3"
+	"github.com/dreadl0ck/tlsx"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/open-ch/ja3"
 
 	"github.com/cnaize/meds/lib/util/get"
 )
 
+type tls struct {
+	sni string
+	ja3 string
+}
+
 type Packet struct {
 	packet     gopacket.Packet
 	asn        ASN
-	ja3        *ja3.JA3
+	tls        *tls
 	domains    []string
 	revDomains []string
 }
@@ -32,8 +38,37 @@ func NewPacket(payload []byte) (*Packet, error) {
 	}, nil
 }
 
+func (p *Packet) Trusted() bool {
+	tcp, ok := p.packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
+	if !ok {
+		return true
+	}
+
+	if len(tcp.Payload) < 1 {
+		return false
+	}
+
+	return p.tls != nil
+}
+
+func (p *Packet) GetProto() (layers.IPProtocol, bool) {
+	return get.Proto(p.packet)
+}
+
 func (p *Packet) GetSrcIP() (netip.Addr, bool) {
 	return get.SrcIP(p.packet)
+}
+
+func (p *Packet) GetDstIP() (netip.Addr, bool) {
+	return get.DstIP(p.packet)
+}
+
+func (p *Packet) GetSrcPort() (uint16, bool) {
+	return get.SrcPort(p.packet)
+}
+
+func (p *Packet) GetDstPort() (uint16, bool) {
+	return get.DstPort(p.packet)
 }
 
 func (p *Packet) GetDomains() []string {
@@ -97,47 +132,39 @@ func (p *Packet) GetASN(asnlist *ASNList) (ASN, bool) {
 }
 
 func (p *Packet) GetSNI() (string, bool) {
-	// get from cache
-	if p.ja3 != nil {
-		return p.ja3.GetSNI(), true
-	}
-
-	// load from packet
-	tcp, ok := p.packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
-	if !ok {
+	if !p.parseTLS() {
 		return "", false
 	}
 
-	j, err := ja3.ComputeJA3FromSegment(tcp.LayerPayload())
-	if err != nil {
-		return "", false
-	}
-
-	// save to cache
-	p.ja3 = j
-
-	return p.ja3.GetSNI(), true
+	return p.tls.sni, true
 }
 
 func (p *Packet) GetJA3() (string, bool) {
-	// get from cache
-	if p.ja3 != nil {
-		return p.ja3.GetJA3Hash(), true
+	if !p.parseTLS() {
+		return "", false
 	}
 
-	// load from packet
+	return p.tls.ja3, true
+}
+
+func (p *Packet) parseTLS() bool {
+	if p.tls != nil {
+		return len(p.tls.sni) > 0 || len(p.tls.ja3) > 0
+	}
+	p.tls = &tls{}
+
 	tcp, ok := p.packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
 	if !ok {
-		return "", false
+		return false
 	}
 
-	j, err := ja3.ComputeJA3FromSegment(tcp.LayerPayload())
-	if err != nil {
-		return "", false
+	var clientHello tlsx.ClientHelloBasic
+	if err := clientHello.Unmarshal(tcp.Payload); err != nil {
+		return false
 	}
 
-	// save to cache
-	p.ja3 = j
+	p.tls.sni = clientHello.SNI
+	p.tls.ja3 = ja3.DigestHex(&clientHello)
 
-	return p.ja3.GetJA3Hash(), true
+	return true
 }

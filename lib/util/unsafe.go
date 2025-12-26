@@ -3,11 +3,9 @@ package util
 import "unsafe"
 
 func BytesToString(str []byte) string {
-	data := unsafe.SliceData(str)
-	return unsafe.String(data, len(str))
+	return unsafe.String(unsafe.SliceData(str), len(str))
 }
 
 func StringToBytes(str string) []byte {
-	data := unsafe.StringData(str)
-	return unsafe.Slice(data, len(str))
+	return unsafe.Slice(unsafe.StringData(str), len(str))
 }

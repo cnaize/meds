@@ -38,7 +38,7 @@ func main() {
 	flag.UintVar(&cfg.ReadersCount, "readers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue readers count")
 	flag.UintVar(&cfg.WorkersCount, "workers-count", 1, "nfqueue workers count (per reader)")
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(max(1, runtime.GOMAXPROCS(0)/4)), "logger workers count")
-	flag.UintVar(&cfg.ReaderQLen, "reader-queue-len", 4096, "nfqueue queue length (per reader)")
+	flag.UintVar(&cfg.ReaderQLen, "reader-queue-len", 8192, "nfqueue queue length (per reader)")
 	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")

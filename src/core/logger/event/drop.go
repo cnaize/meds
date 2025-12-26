@@ -40,7 +40,7 @@ func (e Drop) Send(logger *zerolog.Logger) {
 	if e.Packet != nil {
 		var target string
 		switch e.Filter {
-		case filter.FilterTypeRate, filter.FilterTypeIP:
+		case filter.FilterTypeIP, filter.FilterTypeRate:
 			if srcIP, ok := e.Packet.GetSrcIP(); ok {
 				target = srcIP.String()
 			}

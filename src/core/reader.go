@@ -71,14 +71,14 @@ func (r *Reader) hookFn(a nfqueue.Attribute) int {
 		// good
 	default:
 		r.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		r.logger.Log(event.NewError(zerolog.ErrorLevel, "reader chan is full", nil))
+		r.logger.Log(event.NewError(zerolog.ErrorLevel, "reader is full", nil))
 	}
 
 	return 0
 }
 
 func (r *Reader) errFn(err error) int {
-	r.logger.Log(event.NewError(zerolog.ErrorLevel, "nfqueue error skipped", err))
+	r.logger.Log(event.NewError(zerolog.ErrorLevel, "nfqueue error", err))
 
 	return 0
 }

@@ -1,7 +1,7 @@
 package api
 
 //	@title			Meds: net healing
-//	@version		v0.8.0
+//	@version		v0.9.0
 //	@description	NFQUEUE firewall written in Go
 //
 //	@contact.name	cnaize

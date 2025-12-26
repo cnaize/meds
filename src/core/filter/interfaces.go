@@ -19,7 +19,6 @@ const (
 	FilterTypeGeo    FilterType = "geo"
 	FilterTypeASN    FilterType = "asn"
 	FilterTypeJA3    FilterType = "ja3"
-	FilterTypeMeta   FilterType = "meta"
 	FilterTypeRate   FilterType = "rate"
 	FilterTypeDomain FilterType = "domain"
 )

@@ -14,6 +14,13 @@ func NewBucket(burst uint) *Bucket {
 	return (&Bucket{}).Reset(burst)
 }
 
+func (b *Bucket) Reset(burst uint) *Bucket {
+	b.balance.Store(int64(burst))
+	b.updated.Store(time.Now().UnixNano())
+
+	return b
+}
+
 // approximate but fast
 func (b *Bucket) Allow(rate, burst uint) bool {
 	now := time.Now().UnixNano()
@@ -36,11 +43,4 @@ func (b *Bucket) Allow(rate, burst uint) bool {
 	}
 
 	return true
-}
-
-func (b *Bucket) Reset(burst uint) *Bucket {
-	b.balance.Store(int64(burst))
-	b.updated.Store(time.Now().UnixNano())
-
-	return b
 }

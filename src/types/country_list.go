@@ -2,6 +2,7 @@ package types
 
 import (
 	"maps"
+	"strings"
 	"sync/atomic"
 
 	"github.com/cnaize/meds/lib/util/get"
@@ -21,21 +22,21 @@ func NewCountryList() *CountryList {
 func (l *CountryList) GetAll() []string {
 	list := *l.list.Load()
 	coutries := make([]string, 0, len(list))
-	for country := range maps.Keys(list) {
-		coutries = append(coutries, country)
+	for country := range list {
+		coutries = append(coutries, strings.ToLower(country))
 	}
 
 	return coutries
 }
 
 func (l *CountryList) Lookup(country string) bool {
-	return (*l.list.Load())[country]
+	return (*l.list.Load())[strings.ToLower(country)]
 }
 
 func (l *CountryList) Upsert(coutries []string) error {
 	list := maps.Clone(*l.list.Load())
 	for _, country := range coutries {
-		list[country] = true
+		list[strings.ToLower(country)] = true
 	}
 
 	l.list.Store(&list)
@@ -46,7 +47,7 @@ func (l *CountryList) Upsert(coutries []string) error {
 func (l *CountryList) Remove(countries []string) error {
 	list := maps.Clone(*l.list.Load())
 	for _, country := range countries {
-		delete(list, country)
+		delete(list, strings.ToLower(country))
 	}
 
 	l.list.Store(&list)

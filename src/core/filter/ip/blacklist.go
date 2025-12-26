@@ -40,7 +40,7 @@ func (f *BlackList) Load(ctx context.Context) error {
 func (f *BlackList) Check(packet *types.Packet) bool {
 	srcIP, ok := packet.GetSrcIP()
 	if !ok {
-		return false
+		return true
 	}
 
 	return !f.blacklist.Lookup(netip.PrefixFrom(srcIP, 32))

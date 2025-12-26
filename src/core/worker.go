@@ -2,9 +2,11 @@ package core
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/florianl/go-nfqueue/v2"
 	"github.com/rs/zerolog"
+	"github.com/ti-mo/conntrack"
 
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
@@ -15,6 +17,7 @@ import (
 type Worker struct {
 	nfq *nfqueue.Nfqueue
 	rch <-chan nfqueue.Attribute
+	cnt *conntrack.Conn
 
 	filters []filter.Filter
 	logger  *logger.Logger
@@ -28,12 +31,17 @@ func NewWorker(filters []filter.Filter, logger *logger.Logger) *Worker {
 }
 
 func (w *Worker) Run(ctx context.Context, nfq *nfqueue.Nfqueue, rch <-chan nfqueue.Attribute) error {
+	w.logger.Raw().Info().Msg("Running worker...")
+
+	cnt, err := conntrack.Dial(nil)
+	if err != nil {
+		return fmt.Errorf("conntrack dial: %w", err)
+	}
+	defer cnt.Close()
+
 	w.nfq = nfq
 	w.rch = rch
-
-	w.logger.Raw().
-		Info().
-		Msg("Running worker...")
+	w.cnt = cnt
 
 	for {
 		select {
@@ -49,7 +57,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	// accept empty payload
 	if a.Payload == nil {
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "empty payload", filter.FilterTypeEmpty, nil))
+		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "empty payload", filter.FilterTypeEmpty, nil))
 
 		return
 	}
@@ -58,7 +66,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	packet, err := types.NewPacket(*a.Payload)
 	if err != nil {
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet skipped", "decode failed", filter.FilterTypeEmpty, nil))
+		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "decode failed", filter.FilterTypeEmpty, nil))
 
 		return
 	}
@@ -66,7 +74,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	// accept invalid packet
 	if _, ok := packet.GetSrcIP(); !ok {
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet skipped", "invalid packet", filter.FilterTypeIP, packet))
+		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "invalid packet", filter.FilterTypeIP, packet))
 
 		return
 	}
@@ -92,7 +100,35 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		}
 	}
 
+	// mark trusted connections
+	if packet.Trusted() {
+		if err := w.trustConnection(packet, a.Mark); err != nil {
+			w.logger.Log(event.NewMessage(zerolog.DebugLevel, "trust failed"))
+		}
+	}
+
 	// accept by default
 	w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", filter.FilterTypeEmpty, packet))
+}
+
+func (w *Worker) trustConnection(packet *types.Packet, currMark *uint32) error {
+	proto, _ := packet.GetProto()
+	srcIP, _ := packet.GetSrcIP()
+	dstIP, _ := packet.GetDstIP()
+	srcPort, _ := packet.GetSrcPort()
+	dstPort, _ := packet.GetDstPort()
+
+	newMark := ConnMark
+	if currMark != nil {
+		newMark |= *currMark
+	}
+
+	if err := w.cnt.Update(conntrack.NewFlow(uint8(proto), 0, srcIP, dstIP, srcPort, dstPort, 0, newMark)); err != nil {
+		return fmt.Errorf("update: %w", err)
+	}
+
+	w.logger.Log(event.NewTrust(zerolog.InfoLevel, "connection marked", "trusted packet", packet))
+
+	return nil
 }

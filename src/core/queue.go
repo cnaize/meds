@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
+	"strconv"
 	"time"
 
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/rs/zerolog"
 
 	"github.com/cnaize/meds/src/core/filter"
@@ -14,6 +15,8 @@ import (
 	"github.com/cnaize/meds/src/core/logger/event"
 	"github.com/cnaize/meds/src/core/metrics"
 )
+
+const ConnMark uint32 = 0x100000
 
 type Queue struct {
 	qcount uint
@@ -52,6 +55,7 @@ func NewQueue(qcount uint, wcount uint, qlen uint, filters []filter.Filter, logg
 
 func (q *Queue) Load(ctx context.Context) error {
 	q.logger.Raw().Info().Msg("Loading queue...")
+
 	for _, filter := range q.filters {
 		if err := filter.Load(ctx); err != nil {
 			return fmt.Errorf("%s (%s): filter load: %w", filter.Name(), filter.Type(), err)
@@ -141,31 +145,39 @@ func (q *Queue) Close() error {
 }
 
 func (q *Queue) ipTablesUp() error {
-	cmd := exec.Command("iptables", "-I", "INPUT", "-j", "NFQUEUE", "--queue-bypass")
-	if q.qcount > 1 {
-		// WARNING: always balancing NFQUEUE from 0
-		cmd.Args = append(cmd.Args, "--queue-balance", fmt.Sprintf("%d:%d", 0, q.qcount-1))
-	}
-
-	out, err := cmd.CombinedOutput()
+	ipt, err := iptables.New()
 	if err != nil {
-		return fmt.Errorf("exec: %s", out)
+		return fmt.Errorf("iptables new: %w", err)
 	}
 
-	return nil
+	return q.manageIptables(ipt.AppendUnique)
 }
 
 func (q *Queue) ipTablesDown() error {
-	cmd := exec.Command("iptables", "-D", "INPUT", "-j", "NFQUEUE", "--queue-bypass")
-	if q.qcount > 1 {
-		// WARNING: always balancing NFQUEUE from 0
-		cmd.Args = append(cmd.Args, "--queue-balance", fmt.Sprintf("%d:%d", 0, q.qcount-1))
-	}
-
-	out, err := cmd.CombinedOutput()
+	ipt, err := iptables.New()
 	if err != nil {
-		return fmt.Errorf("exec: %s", out)
+		return fmt.Errorf("iptables new: %w", err)
 	}
 
-	return nil
+	return q.manageIptables(ipt.DeleteIfExists)
+}
+
+func (q *Queue) manageIptables(action func(table, chain string, rulespec ...string) error) error {
+	mark := "0x" + strconv.FormatUint(uint64(ConnMark), 16)
+	comment := "MEDS_NET_HEALING"
+
+	if err := action("mangle", "PREROUTING", "-j", "CONNMARK", "--restore-mark", "--mask", mark, "-m", "comment", "--comment", comment); err != nil {
+		return err
+	}
+
+	if err := action("filter", "INPUT", "-m", "connmark", "--mark", mark+"/"+mark, "-m", "comment", "--comment", comment, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+
+	args := []string{"-m", "connmark", "--mark", "0x0/" + mark, "-m", "comment", "--comment", comment, "-j", "NFQUEUE", "--queue-bypass"}
+	if q.qcount > 1 {
+		args = append(args, "--queue-balance", fmt.Sprintf("0:%d", q.qcount-1))
+	}
+
+	return action("filter", "INPUT", args...)
 }

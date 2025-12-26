@@ -6,21 +6,65 @@ import (
 	"slices"
 	"strings"
 
-	"darvaza.org/x/tls/sni"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/open-ch/ja3"
 
 	"github.com/cnaize/meds/lib/util"
 )
 
-func SrcIP(packet gopacket.Packet) (netip.Addr, bool) {
+func Proto(packet gopacket.Packet) (layers.IPProtocol, bool) {
 	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 	if !ok {
+		return 0, false
+	}
+
+	return ip4.Protocol, true
+}
+
+func SrcIP(packet gopacket.Packet) (netip.Addr, bool) {
+	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	if !ok || len(ip4.SrcIP) != 4 {
 		return netip.Addr{}, false
 	}
 
-	return netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP.To4())), true
+	return netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP)), true
+}
+
+func DstIP(packet gopacket.Packet) (netip.Addr, bool) {
+	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	if !ok || len(ip4.DstIP) != 4 {
+		return netip.Addr{}, false
+	}
+
+	return netip.AddrFrom4(*(*[4]byte)(ip4.DstIP)), true
+}
+
+func SrcPort(packet gopacket.Packet) (uint16, bool) {
+	tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
+	if ok {
+		return uint16(tcp.SrcPort), true
+	}
+
+	udp, ok := packet.Layer(layers.LayerTypeUDP).(*layers.UDP)
+	if ok {
+		return uint16(udp.SrcPort), true
+	}
+
+	return 0, false
+}
+
+func DstPort(packet gopacket.Packet) (uint16, bool) {
+	tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
+	if ok {
+		return uint16(tcp.DstPort), true
+	}
+
+	udp, ok := packet.Layer(layers.LayerTypeUDP).(*layers.UDP)
+	if ok {
+		return uint16(udp.DstPort), true
+	}
+
+	return 0, false
 }
 
 func Subnet(str string) (netip.Prefix, bool) {
@@ -109,43 +153,6 @@ func DNSDomains(packet gopacket.Packet) []string {
 	}
 
 	return domains
-}
-
-func SNI(packet gopacket.Packet) (string, bool) {
-	tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
-	if !ok {
-		return "", false
-	}
-
-	info := sni.GetInfo(tcp.LayerPayload())
-	if info == nil {
-		return "", false
-	}
-
-	return info.ServerName, true
-}
-
-func Domains(packet gopacket.Packet) []string {
-	domains := DNSDomains(packet)
-	if sni, ok := SNI(packet); ok && len(sni) > 0 {
-		domains = append(domains, sni)
-	}
-
-	return domains
-}
-
-func JA3(packet gopacket.Packet) (string, bool) {
-	tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
-	if !ok {
-		return "", false
-	}
-
-	j, err := ja3.ComputeJA3FromSegment(tcp.LayerPayload())
-	if err != nil {
-		return "", false
-	}
-
-	return j.GetJA3Hash(), true
 }
 
 func ReversedDomain(domain string) string {
