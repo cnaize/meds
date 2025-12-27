@@ -84,6 +84,9 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		if checker.Check(packet) {
 			// accept whitelists
 			if checker.Name() == filter.FilterNameWhiteList {
+				// mark trusted connection
+				w.trustConnection(packet, a.Mark)
+
 				w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 				w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", checker.Name(), checker.Type(), packet))
 
@@ -100,11 +103,9 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		}
 	}
 
-	// mark trusted connections
+	// mark trusted connection
 	if packet.Trusted() {
-		if err := w.trustConnection(packet, a.Mark); err != nil {
-			w.logger.Log(event.NewMessage(zerolog.DebugLevel, "trust failed"))
-		}
+		w.trustConnection(packet, a.Mark)
 	}
 
 	// accept by default
@@ -112,7 +113,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", filter.FilterTypeEmpty, packet))
 }
 
-func (w *Worker) trustConnection(packet *types.Packet, currMark *uint32) error {
+func (w *Worker) trustConnection(packet *types.Packet, currMark *uint32) {
 	proto, _ := packet.GetProto()
 	srcIP, _ := packet.GetSrcIP()
 	dstIP, _ := packet.GetDstIP()
@@ -125,10 +126,10 @@ func (w *Worker) trustConnection(packet *types.Packet, currMark *uint32) error {
 	}
 
 	if err := w.cnt.Update(conntrack.NewFlow(uint8(proto), 0, srcIP, dstIP, srcPort, dstPort, 0, newMark)); err != nil {
-		return fmt.Errorf("update: %w", err)
+		w.logger.Log(event.NewMessage(zerolog.DebugLevel, "trust failed"))
+
+		return
 	}
 
 	w.logger.Log(event.NewTrust(zerolog.InfoLevel, "connection marked", "trusted packet", packet))
-
-	return nil
 }

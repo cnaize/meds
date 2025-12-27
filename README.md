@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.9.0-blue)
+![Version](https://img.shields.io/badge/version-v0.9.1-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -173,7 +173,10 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
                               ↳ Global Domain/SNI Blacklist
                               ↳ Domain/SNI Filters
                               ↳ TLS JA3 Filters
-                              ↳ Decision: DROP / MARK / ACCEPT
+                              ↳ Decision:
+                                - DROP
+                                - ACCEPT
+                                - MARK + ACCEPT
 ```
 
 - **Hybrid Traffic Flow**  
@@ -196,7 +199,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 - **Decision engine**  
   - **DROP** → packet is malicious, discarded immediately  
-  - **MARK** → marks the connection as trusted in the kernel (via Netlink) once all checks are passed
+  - **MARK** → marks the connection as trusted in the kernel via Conntrack for wire-speed handling  
   - **ACCEPT** → packet is safe, passed to kernel stack  
 
 - **Metrics & logging**  
@@ -211,22 +214,23 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 ```text
 # HELP meds_core_connections_trusted_total Total number of trusted connections
 # TYPE meds_core_connections_trusted_total counter
-meds_core_connections_trusted_total{reason="trusted packet"} 92
+meds_core_connections_trusted_total{reason="trusted packet"} 172
 
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="default"} 798
-meds_core_packets_accepted_total{filter="ip",reason="WhiteList"} 84
+meds_core_packets_accepted_total{filter="empty",reason="decode failed"} 1
+meds_core_packets_accepted_total{filter="empty",reason="default"} 2206
+meds_core_packets_accepted_total{filter="ip",reason="WhiteList"} 256
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 14
-meds_core_packets_dropped_total{filter="geo",reason="IPLocate"} 7
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 350
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 15
+meds_core_packets_dropped_total{filter="geo",reason="IPLocate"} 4
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 935
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 1253
+meds_core_packets_processed_total 3417
 ```
 
 ---
