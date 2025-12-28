@@ -68,10 +68,6 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 				continue
 			}
 
-			if entry.ASN < 1 {
-				continue
-			}
-
 			blacklist[entry.ASN] = true
 		}
 	}

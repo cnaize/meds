@@ -2,18 +2,18 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v0.9.1-blue)
+![Version](https://img.shields.io/badge/version-v1.0.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
 ---
 
 # Meds: net healing  
-> High-performance firewall powered by NFQUEUE, Conntrack, and Go
+> Intelligent firewall in Go
 
 It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering to block malicious traffic in real-time. Once a connection is verified, Meds offloads it back to the kernel using **Conntrack marks** for maximum throughput.
 
-*Designed to cure your network from malicious traffic.*
+*Designed to cure your network from malicious traffic*
 
 ---
 
@@ -97,13 +97,79 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 ---
 
-## ✨ Key Features
+## 🔍 How It Works
+```text
+                    PACKET
+                      │
+┌─────────────────────▼─────────────────────┐
+│ KERNEL SPACE (Netfilter / Mangle)         │
+│ ───────────────────────────────────────── │
+│ [Restore Connmark] ──► [Already Marked?] ─┼──┐
+└─────────────────────┬─────────────────────┘  │
+                      │ No (Slow Path)         │ Yes
+  ┌───────────────────▼───────────────────┐    │ (Fast Path)
+  │ USER SPACE (Meds Firewall)            │    │
+  │ ───────────────────────────────────── │    │
+  │   1. Global IP Whitelist              │    │
+  │   2. Rate Limiter (per source IP)     │    │
+  │   3. Global IP Blacklist              │    │
+  │   4. IP Filters                       │    │
+  │   5. Geo Filters                      │    │
+  │   6. ASN Filters                      │    │
+  │   7. Global Domain/SNI Whitelist      │    │
+  │   8. Global Domain/SNI Blacklist      │    │
+  │   9. Domain/SNI Filters               │    │
+  │  10. TLS JA3 Filters                  │    │
+  └──────────────────┬────────────────────┘    │
+                     │                         │
+  ┌──────────────────▼────────────────────┐    │
+  │ DECISION ENGINE                       │    │
+  │ ───────────────────────────────────── │    │
+  │   [DROP]   ──► Discard packet         │    │
+  │   [ACCEPT] ──► Pass once             ─┼──┐ │
+  │   [MARK]   ──► Set Connmark + ACCEPT ─┼──┤ │
+  └───────────────────────────────────────┘  │ │
+                                             ▼ ▼
+                                       TRAFFIC ALLOWED
+```
 
-- **Hybrid Processing (Conntrack Acceleration)**  
-  Uses **Conntrack marks** to offload trusted connections. Once a flow is validated in user space, it is marked in the kernel's connection tracking table. Subsequent packets of that flow stay in the kernel, achieving wire-speed performance.
+- **Hybrid Traffic Flow**  
+  Meds optimizes traffic by splitting it into two paths:
+  - **Fast Path (Kernel)**: packets belonging to established/trusted connections (marked via `CONNMARK`) are processed entirely by the Linux kernel.  
+  - **Inspection Path (User Space)**: new or unmarked packets are sent to Meds via NFQUEUE.  
+
+- **Classification pipeline**  
+  Packets are processed according to the following pipeline:
+  - **Global IP Whitelist** — immediate pass for trusted source IPs
+  - **Rate Limiter** — protects system resources by limiting packet rate per source IP
+  - **Global IP Blacklist** — immediate block for malicious source IPs
+  - **IP Filters** — applies granular IP-based filtering rules
+  - **Geo Filters** — filters traffic by country of origin using ASN metadata
+  - **ASN Filters** — checks Autonomous System reputation against blacklists
+  - **Global Domain/SNI Whitelist** — permits trusted domains extracted from DNS or TLS SNI
+  - **Global Domain/SNI Blacklist** — blocks malicious domains from DNS or TLS SNI
+  - **Domain/SNI Filters** — applies granular domain-based filtering rules
+  - **TLS JA3 Filters** — detects malicious clients via TLS fingerprinting
+
+- **Decision engine**  
+  - **DROP** → packet is malicious, discarded immediately  
+  - **MARK** → marks the connection as trusted in the kernel via Conntrack for wire-speed handling  
+  - **ACCEPT** → packet is safe, passed to kernel stack  
+
+- **Metrics & logging**  
+  Every decision is counted and exported for monitoring and alerting.  
+  Metrics are Prometheus-compatible and can be visualized in Grafana.  
+  All events are asynchronously logged to minimize packet processing latency.  
+
+---
+
+## ✨ Key Features
 
 - **NFQUEUE-based packet interception**  
   Uses Linux Netfilter queues to copy inbound packets into user space with minimal overhead, only for the "Decision Phase" of a connection.
+
+- **Hybrid Processing (Conntrack Acceleration)**  
+  Uses **Conntrack marks** to offload trusted connections. Once a flow is validated in user space, it is marked in the kernel's connection tracking table. Subsequent packets of that flow stay in the kernel, achieving wire-speed performance.
 
 - **Lock-free core**  
   Meds itself does not use any mutexes — all filtering, counters, and rate-limiters use atomic operations.
@@ -158,79 +224,28 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 ---
 
-## 🔍 How It Works
-```text
-[Kernel: Mangle] → Restore Connmark → [Mark set?] → (Yes) → [Kernel: Filter: ACCEPT] (Fast Path)
-                                        ↓ (No)
-[Kernel: Filter] → [NFQUEUE] → [Meds: User Space] (Slow Path)
-                              ↳ Global IP Whitelist
-                              ↳ Rate Limiter (per source IP)
-                              ↳ Global IP Blacklist
-                              ↳ IP Filters
-                              ↳ Geo Filters
-                              ↳ ASN Filters
-                              ↳ Global Domain/SNI Whitelist
-                              ↳ Global Domain/SNI Blacklist
-                              ↳ Domain/SNI Filters
-                              ↳ TLS JA3 Filters
-                              ↳ Decision:
-                                - DROP
-                                - ACCEPT
-                                - MARK + ACCEPT
-```
-
-- **Hybrid Traffic Flow**  
-  Meds optimizes traffic by splitting it into two paths:
-  - **Fast Path (Kernel)**: packets belonging to established/trusted connections (marked via `CONNMARK`) are processed entirely by the Linux kernel.  
-  - **Inspection Path (User Space)**: new or unmarked packets are sent to Meds via NFQUEUE.  
-
-- **Classification pipeline**  
-  Packets are processed according to the following pipeline:
-  - **Global IP Whitelist** — immediate pass for trusted source IPs
-  - **Rate Limiter** — protects system resources by limiting packet rate per source IP
-  - **Global IP Blacklist** — immediate block for malicious source IPs
-  - **IP Filters** — applies granular IP-based filtering rules
-  - **Geo Filters** — filters traffic by country of origin using ASN metadata
-  - **ASN Filters** — checks Autonomous System reputation against blacklists
-  - **Global Domain/SNI Whitelist** — permits trusted domains extracted from DNS or TLS SNI
-  - **Global Domain/SNI Blacklist** — blocks malicious domains from DNS or TLS SNI
-  - **Domain/SNI Filters** — applies granular domain-based filtering rules
-  - **TLS JA3 Filters** — detects malicious clients via TLS fingerprinting
-
-- **Decision engine**  
-  - **DROP** → packet is malicious, discarded immediately  
-  - **MARK** → marks the connection as trusted in the kernel via Conntrack for wire-speed handling  
-  - **ACCEPT** → packet is safe, passed to kernel stack  
-
-- **Metrics & logging**  
-  Every decision is counted and exported for monitoring and alerting.  
-  Metrics are Prometheus-compatible and can be visualized in Grafana.  
-  All events are asynchronously logged to minimize packet processing latency.  
-
----
-
 ## 📊 Example Metrics (Prometheus)
 
 ```text
 # HELP meds_core_connections_trusted_total Total number of trusted connections
 # TYPE meds_core_connections_trusted_total counter
-meds_core_connections_trusted_total{reason="trusted packet"} 172
+meds_core_connections_trusted_total{reason="trusted packet"} 2843
 
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="decode failed"} 1
-meds_core_packets_accepted_total{filter="empty",reason="default"} 2206
-meds_core_packets_accepted_total{filter="ip",reason="WhiteList"} 256
+meds_core_packets_accepted_total{filter="empty",reason="default"} 20832
+meds_core_packets_accepted_total{filter="ip",reason="WhiteList"} 668
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 15
-meds_core_packets_dropped_total{filter="geo",reason="IPLocate"} 4
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 935
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 130
+meds_core_packets_dropped_total{filter="geo",reason="IPLocate"} 22
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 7980
+meds_core_packets_dropped_total{filter="rate",reason="Limiter"} 11
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 3417
+meds_core_packets_processed_total 29653
 ```
 
 ---

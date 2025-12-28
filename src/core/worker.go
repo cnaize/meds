@@ -62,19 +62,11 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		return
 	}
 
-	// accept broken packet
-	packet, err := types.NewPacket(*a.Payload)
-	if err != nil {
-		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "decode failed", filter.FilterTypeEmpty, nil))
-
-		return
-	}
-
-	// accept invalid packet
+	// accept unknown packet
+	packet := types.NewPacket(*a.Payload)
 	if _, ok := packet.GetSrcIP(); !ok {
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", "invalid packet", filter.FilterTypeIP, packet))
+		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "unknown packet", filter.FilterTypeIP, packet))
 
 		return
 	}
@@ -104,7 +96,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	}
 
 	// mark trusted connection
-	if packet.Trusted() {
+	if packet.IsTrusted() {
 		w.trustConnection(packet, a.Mark)
 	}
 
