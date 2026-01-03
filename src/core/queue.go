@@ -166,15 +166,53 @@ func (q *Queue) manageIptables(action func(table, chain string, rulespec ...stri
 	mark := "0x" + strconv.FormatUint(uint64(ConnMark), 16)
 	comment := "MEDS_NET_HEALING"
 
-	if err := action("mangle", "PREROUTING", "-j", "CONNMARK", "--restore-mark", "--mask", mark, "-m", "comment", "--comment", comment); err != nil {
+	if err := action(
+		"mangle",
+		"PREROUTING",
+		"-m",
+		"comment",
+		"--comment",
+		comment,
+		"-j",
+		"CONNMARK",
+		"--restore-mark",
+		"--mask",
+		"0xFFFFFFFF",
+	); err != nil {
 		return err
 	}
 
-	if err := action("filter", "INPUT", "-m", "connmark", "--mark", mark+"/"+mark, "-m", "comment", "--comment", comment, "-j", "ACCEPT"); err != nil {
+	if err := action(
+		"filter",
+		"INPUT",
+		"-m",
+		"comment",
+		"--comment",
+		comment,
+		"-m",
+		"connmark",
+		"--mark",
+		mark+"/"+mark,
+		"-j",
+		"RETURN",
+	); err != nil {
 		return err
 	}
 
-	args := []string{"-m", "connmark", "--mark", "0x0/" + mark, "-m", "comment", "--comment", comment, "-j", "NFQUEUE", "--queue-bypass"}
+	args := []string{
+		"-m",
+		"comment",
+		"--comment",
+		comment,
+		"-m",
+		"connmark",
+		"!",
+		"--mark",
+		mark + "/" + mark,
+		"-j",
+		"NFQUEUE",
+		"--queue-bypass",
+	}
 	if q.qcount > 1 {
 		args = append(args, "--queue-balance", fmt.Sprintf("0:%d", q.qcount-1))
 	}

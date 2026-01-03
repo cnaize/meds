@@ -65,12 +65,8 @@ func NewPacket(payload []byte) *Packet {
 }
 
 func (p *Packet) IsTrusted() bool {
-	if tcp, ok := p.packet.Layer(layers.LayerTypeTCP).(*layers.TCP); ok {
-		if len(tcp.Payload) > 0 {
-			return p.isTouched(packetKeyTLS)
-		}
-
-		return false
+	if _, ok := p.packet.Layer(layers.LayerTypeTCP).(*layers.TCP); ok {
+		return p.isStored(packetKeyTLS)
 	}
 
 	if _, ok := p.packet.Layer(layers.LayerTypeDNS).(*layers.DNS); ok {

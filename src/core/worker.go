@@ -2,11 +2,9 @@ package core
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/florianl/go-nfqueue/v2"
 	"github.com/rs/zerolog"
-	"github.com/ti-mo/conntrack"
 
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
@@ -17,7 +15,6 @@ import (
 type Worker struct {
 	nfq *nfqueue.Nfqueue
 	rch <-chan nfqueue.Attribute
-	cnt *conntrack.Conn
 
 	filters []filter.Filter
 	logger  *logger.Logger
@@ -33,15 +30,8 @@ func NewWorker(filters []filter.Filter, logger *logger.Logger) *Worker {
 func (w *Worker) Run(ctx context.Context, nfq *nfqueue.Nfqueue, rch <-chan nfqueue.Attribute) error {
 	w.logger.Raw().Info().Msg("Running worker...")
 
-	cnt, err := conntrack.Dial(nil)
-	if err != nil {
-		return fmt.Errorf("conntrack dial: %w", err)
-	}
-	defer cnt.Close()
-
 	w.nfq = nfq
 	w.rch = rch
-	w.cnt = cnt
 
 	for {
 		select {
@@ -76,13 +66,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		if checker.Check(packet) {
 			// accept whitelists
 			if checker.Name() == filter.FilterNameWhiteList {
-				// mark trusted connection
-				w.trustConnection(packet, a.Mark)
-
-				w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-				w.logger.Log(event.NewAccept(zerolog.InfoLevel, "packet accepted", checker.Name(), checker.Type(), packet))
-
-				return
+				break
 			}
 		} else {
 			// otherwise drop
@@ -97,7 +81,10 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 
 	// mark trusted connection
 	if packet.IsTrusted() {
-		w.trustConnection(packet, a.Mark)
+		w.nfq.SetVerdictWithOption(*a.PacketID, nfqueue.NfAccept, nfqueue.WithConnMark(newMark(a, ConnMark)))
+		w.logger.Log(event.NewTrust(zerolog.InfoLevel, "connection marked", "trusted packet", packet))
+
+		return
 	}
 
 	// accept by default
@@ -105,23 +92,10 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", filter.FilterTypeEmpty, packet))
 }
 
-func (w *Worker) trustConnection(packet *types.Packet, currMark *uint32) {
-	proto, _ := packet.GetProto()
-	srcIP, _ := packet.GetSrcIP()
-	dstIP, _ := packet.GetDstIP()
-	srcPort, _ := packet.GetSrcPort()
-	dstPort, _ := packet.GetDstPort()
-
-	newMark := ConnMark
-	if currMark != nil {
-		newMark |= *currMark
+func newMark(a nfqueue.Attribute, mark uint32) uint32 {
+	if a.Mark != nil {
+		mark |= *a.Mark
 	}
 
-	if err := w.cnt.Update(conntrack.NewFlow(uint8(proto), 0, srcIP, dstIP, srcPort, dstPort, 0, newMark)); err != nil {
-		w.logger.Log(event.NewMessage(zerolog.DebugLevel, "trust failed"))
-
-		return
-	}
-
-	w.logger.Log(event.NewTrust(zerolog.InfoLevel, "connection marked", "trusted packet", packet))
+	return mark
 }
