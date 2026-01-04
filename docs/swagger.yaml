@@ -113,7 +113,7 @@ info:
     name: MIT
     url: https://opensource.org/licenses/MIT
   title: 'Meds: net healing'
-  version: v1.0.0
+  version: v1.1.0
 paths:
   /v1/blacklist/countries:
     delete:

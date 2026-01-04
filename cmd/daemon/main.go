@@ -45,7 +45,7 @@ func main() {
 	flag.UintVar(&cfg.LimiterRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
 	flag.UintVar(&cfg.LimiterBurst, "rate-limiter-burst", 1500, "max packets at once (per ip)")
 	flag.UintVar(&cfg.LimiterCacheSize, "rate-limiter-cache-size", 100_000, "rate limiter cache size (all buckets)")
-	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-cache-ttl", 3*time.Minute, "rate limiter cache ttl (per bucket)")
+	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-cache-ttl", 5*time.Minute, "rate limiter cache ttl (per bucket)")
 	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
 	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
 	// flag.StringVar(&cfg.Password, "password", "admin", "admin password")
@@ -105,7 +105,17 @@ func main() {
 	)
 
 	// create queue
-	q := core.NewQueue(cfg.ReadersCount, cfg.WorkersCount, cfg.ReaderQLen, filters, logger)
+	q := core.NewQueue(
+		cfg.ReadersCount,
+		cfg.WorkersCount,
+		cfg.ReaderQLen,
+		cfg.LimiterRate,
+		cfg.LimiterBurst,
+		cfg.LimiterCacheSize,
+		cfg.LimiterBucketTTL,
+		filters,
+		logger,
+	)
 	if err := q.Load(mainCtx); err != nil {
 		logger.Raw().Fatal().Err(err).Msg("queue load failed")
 	}

@@ -40,10 +40,6 @@ func (e Accept) Send(logger *zerolog.Logger) {
 	if e.Packet != nil {
 		var target string
 		switch e.Filter {
-		case filter.FilterTypeIP, filter.FilterTypeRate:
-			if srcIP, ok := e.Packet.GetSrcIP(); ok {
-				target = srcIP.String()
-			}
 		case filter.FilterTypeGeo:
 			if asn, ok := e.Packet.GetASN(nil); ok {
 				target = asn.Country
@@ -56,6 +52,10 @@ func (e Accept) Send(logger *zerolog.Logger) {
 			target = strings.Join(e.Packet.GetDomains(), ",")
 		case filter.FilterTypeJA3:
 			target, _ = e.Packet.GetJA3()
+		default:
+			if srcIP, ok := e.Packet.GetSrcIP(); ok {
+				target = srcIP.String()
+			}
 		}
 
 		logger.

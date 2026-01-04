@@ -16,11 +16,22 @@ import (
 	"github.com/cnaize/meds/src/core/metrics"
 )
 
-const ConnMark uint32 = 0x100000
+const MedsChainName = "MEDS"
+
+const (
+	ConnMarkWhiteList uint32 = 0x100000 << iota
+	ConnMarkBlockList
+	ConnMarkTrustList
+)
 
 type Queue struct {
 	qcount uint
 	wcount uint
+
+	limiterRate      uint
+	limiterBurst     uint
+	limiterCacheSize uint
+	limiterBucketTTL time.Duration
 
 	logger  *logger.Logger
 	filters []filter.Filter
@@ -29,7 +40,17 @@ type Queue struct {
 	workers []*Worker
 }
 
-func NewQueue(qcount uint, wcount uint, qlen uint, filters []filter.Filter, logger *logger.Logger) *Queue {
+func NewQueue(
+	qcount,
+	wcount,
+	qlen,
+	limiterRate,
+	limiterBurst,
+	limiterCacheSize uint,
+	limiterBucketTTL time.Duration,
+	filters []filter.Filter,
+	logger *logger.Logger,
+) *Queue {
 	readers := make([]*Reader, 0, qcount)
 	workers := make([]*Worker, 0, qcount*wcount)
 	// WARNING: always balancing NFQUEUE from 0
@@ -44,12 +65,16 @@ func NewQueue(qcount uint, wcount uint, qlen uint, filters []filter.Filter, logg
 	}
 
 	return &Queue{
-		qcount:  qcount,
-		wcount:  wcount,
-		logger:  logger,
-		filters: filters,
-		readers: readers,
-		workers: workers,
+		qcount:           qcount,
+		wcount:           wcount,
+		limiterRate:      limiterRate,
+		limiterBurst:     limiterBurst,
+		limiterCacheSize: limiterCacheSize,
+		limiterBucketTTL: limiterBucketTTL,
+		logger:           logger,
+		filters:          filters,
+		readers:          readers,
+		workers:          workers,
 	}
 }
 
@@ -145,12 +170,113 @@ func (q *Queue) Close() error {
 }
 
 func (q *Queue) ipTablesUp() error {
+	whiteListMark := "0x" + strconv.FormatUint(uint64(ConnMarkWhiteList), 16)
+	blockListMark := "0x" + strconv.FormatUint(uint64(ConnMarkBlockList), 16)
+	trustListMark := "0x" + strconv.FormatUint(uint64(ConnMarkTrustList), 16)
+
 	ipt, err := iptables.New()
 	if err != nil {
 		return fmt.Errorf("iptables new: %w", err)
 	}
 
-	return q.manageIptables(ipt.AppendUnique)
+	if err := ipt.AppendUnique(
+		"mangle",
+		"PREROUTING",
+		"-m",
+		"comment",
+		"--comment",
+		MedsChainName,
+		"-j",
+		"CONNMARK",
+		"--restore-mark",
+		"--mask",
+		"0xFFFFFFFF"); err != nil {
+		return err
+	}
+
+	if ok, err := ipt.ChainExists("filter", MedsChainName); err != nil {
+		return fmt.Errorf("chain exists: %w", err)
+	} else if !ok {
+		if err := ipt.NewChain("filter", MedsChainName); err != nil {
+			return fmt.Errorf("new chain: %w", err)
+		}
+	}
+
+	if err := ipt.AppendUnique(
+		"filter",
+		MedsChainName,
+		"-m",
+		"mark",
+		"--mark",
+		whiteListMark+"/"+whiteListMark,
+		"-j",
+		"ACCEPT",
+	); err != nil {
+		return err
+	}
+
+	if err := ipt.AppendUnique(
+		"filter",
+		MedsChainName,
+		"-m",
+		"mark",
+		"--mark",
+		blockListMark+"/"+blockListMark,
+		"-j",
+		"DROP",
+	); err != nil {
+		return err
+	}
+
+	if err := ipt.AppendUnique(
+		"filter",
+		MedsChainName,
+		"-m",
+		"hashlimit",
+		"--hashlimit-name",
+		"meds-rate",
+		"--hashlimit-mode",
+		"srcip",
+		"--hashlimit-above",
+		fmt.Sprintf("%d/sec", q.limiterRate),
+		"--hashlimit-burst",
+		fmt.Sprintf("%d", q.limiterBurst),
+		"--hashlimit-htable-size",
+		fmt.Sprintf("%d", q.limiterCacheSize),
+		"--hashlimit-htable-expire",
+		fmt.Sprintf("%d", q.limiterBucketTTL.Milliseconds()),
+		"-j",
+		"DROP",
+	); err != nil {
+		return err
+	}
+
+	medsArgs := []string{
+		"-m",
+		"mark",
+		"!",
+		"--mark",
+		trustListMark + "/" + trustListMark,
+		"-m",
+		"connbytes",
+		"--connbytes-mode",
+		"packets",
+		"--connbytes",
+		"0:10",
+		"--connbytes-dir",
+		"original",
+		"-j",
+		"NFQUEUE",
+		"--queue-bypass",
+	}
+	if q.qcount > 1 {
+		medsArgs = append(medsArgs, "--queue-balance", fmt.Sprintf("0:%d", q.qcount-1))
+	}
+	if err := ipt.AppendUnique("filter", MedsChainName, medsArgs...); err != nil {
+		return err
+	}
+
+	return ipt.AppendUnique("filter", "INPUT", "-j", MedsChainName)
 }
 
 func (q *Queue) ipTablesDown() error {
@@ -159,71 +285,24 @@ func (q *Queue) ipTablesDown() error {
 		return fmt.Errorf("iptables new: %w", err)
 	}
 
-	return q.manageIptables(ipt.DeleteIfExists)
-}
-
-func (q *Queue) manageIptables(action func(table, chain string, rulespec ...string) error) error {
-	mark := "0x" + strconv.FormatUint(uint64(ConnMark), 16)
-	comment := "MEDS_NET_HEALING"
-
-	if err := action(
+	if err := ipt.DeleteIfExists(
 		"mangle",
 		"PREROUTING",
 		"-m",
 		"comment",
 		"--comment",
-		comment,
+		MedsChainName,
 		"-j",
 		"CONNMARK",
 		"--restore-mark",
 		"--mask",
-		"0xFFFFFFFF",
-	); err != nil {
+		"0xFFFFFFFF"); err != nil {
 		return err
 	}
 
-	if err := action(
-		"filter",
-		"INPUT",
-		"-m",
-		"comment",
-		"--comment",
-		comment,
-		"-m",
-		"connmark",
-		"--mark",
-		mark+"/"+mark,
-		"-j",
-		"RETURN",
-	); err != nil {
-		return err
+	if err := ipt.DeleteIfExists("filter", "INPUT", "-j", MedsChainName); err != nil {
+		return fmt.Errorf("iptables common: %w", err)
 	}
 
-	args := []string{
-		"-m",
-		"comment",
-		"--comment",
-		comment,
-		"-m",
-		"connmark",
-		"!",
-		"--mark",
-		mark + "/" + mark,
-		"-m",
-		"connbytes",
-		"--connbytes",
-		"0:4096",
-		"--connbytes-mode",
-		"bytes",
-		"--connbytes-dir",
-		"original",
-		"-j",
-		"NFQUEUE",
-		"--queue-bypass",
-	}
-	if q.qcount > 1 {
-		args = append(args, "--queue-balance", fmt.Sprintf("0:%d", q.qcount-1))
-	}
-
-	return action("filter", "INPUT", args...)
+	return ipt.ClearAndDeleteChain("filter", MedsChainName)
 }
