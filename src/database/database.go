@@ -9,6 +9,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/cnaize/meds/src/config"
 	"github.com/cnaize/meds/src/core/logger"
 )
 
@@ -19,20 +20,20 @@ type Database struct {
 	Q  *Queries
 	DB *sql.DB
 
-	path   string
+	cfg    *config.Config
 	logger *logger.Logger
 }
 
-func NewDatabase(path string, logger *logger.Logger) *Database {
+func NewDatabase(cfg *config.Config, logger *logger.Logger) *Database {
 	return &Database{
 		Q:      New(),
-		path:   path,
+		cfg:    cfg,
 		logger: logger,
 	}
 }
 
 func (d *Database) Init(ctx context.Context) error {
-	db, err := sql.Open("sqlite", d.path)
+	db, err := sql.Open("sqlite", d.cfg.DBFilePath)
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}

@@ -10,18 +10,6 @@ CREATE TABLE IF NOT EXISTS subnet_blacklist (
 
 CREATE INDEX IF NOT EXISTS idx_snbl_subnet ON subnet_blacklist (subnet);
 
-CREATE TABLE IF NOT EXISTS domain_whitelist (
-    domain TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_dmwl_domain ON domain_whitelist (domain);
-
-CREATE TABLE IF NOT EXISTS domain_blacklist (
-    domain TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_dmbl_domain ON domain_blacklist (domain);
-
 CREATE TABLE IF NOT EXISTS country_blacklist (
     country TEXT NOT NULL
 );

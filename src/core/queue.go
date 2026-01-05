@@ -10,6 +10,7 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/rs/zerolog"
 
+	"github.com/cnaize/meds/src/config"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/core/logger/event"
@@ -25,13 +26,7 @@ const (
 )
 
 type Queue struct {
-	qcount uint
-	wcount uint
-
-	limiterRate      uint
-	limiterBurst     uint
-	limiterCacheSize uint
-	limiterBucketTTL time.Duration
+	cfg *config.Config
 
 	logger  *logger.Logger
 	filters []filter.Filter
@@ -40,41 +35,26 @@ type Queue struct {
 	workers []*Worker
 }
 
-func NewQueue(
-	qcount,
-	wcount,
-	qlen,
-	limiterRate,
-	limiterBurst,
-	limiterCacheSize uint,
-	limiterBucketTTL time.Duration,
-	filters []filter.Filter,
-	logger *logger.Logger,
-) *Queue {
-	readers := make([]*Reader, 0, qcount)
-	workers := make([]*Worker, 0, qcount*wcount)
+func NewQueue(cfg *config.Config, filters []filter.Filter, logger *logger.Logger) *Queue {
+	readers := make([]*Reader, 0, cfg.ReadersCount)
+	workers := make([]*Worker, 0, cfg.ReadersCount*cfg.WorkersCount)
 	// WARNING: always balancing NFQUEUE from 0
-	for qnum := 0; qnum < int(qcount); qnum++ {
-		reader := NewReader(uint16(qnum), uint32(qlen), logger)
+	for qnum := 0; qnum < int(cfg.ReadersCount); qnum++ {
+		reader := NewReader(uint16(qnum), uint32(cfg.ReaderQLen), logger)
 		readers = append(readers, reader)
 
 		// workers per reader
-		for range wcount {
+		for range cfg.WorkersCount {
 			workers = append(workers, NewWorker(filters, logger))
 		}
 	}
 
 	return &Queue{
-		qcount:           qcount,
-		wcount:           wcount,
-		limiterRate:      limiterRate,
-		limiterBurst:     limiterBurst,
-		limiterCacheSize: limiterCacheSize,
-		limiterBucketTTL: limiterBucketTTL,
-		logger:           logger,
-		filters:          filters,
-		readers:          readers,
-		workers:          workers,
+		cfg:     cfg,
+		logger:  logger,
+		filters: filters,
+		readers: readers,
+		workers: workers,
 	}
 }
 
@@ -100,7 +80,7 @@ func (q *Queue) Run(ctx context.Context) error {
 		}
 
 		// run workers
-		for j := i * int(q.wcount); j < i*int(q.wcount)+int(q.wcount); j++ {
+		for j := i * int(q.cfg.WorkersCount); j < i*int(q.cfg.WorkersCount)+int(q.cfg.WorkersCount); j++ {
 			go func() {
 				if err := q.workers[j].Run(ctx, reader.nfq, reader.wch); err != nil {
 					msg := "worker run"
@@ -238,13 +218,13 @@ func (q *Queue) ipTablesUp() error {
 		"--hashlimit-mode",
 		"srcip",
 		"--hashlimit-above",
-		fmt.Sprintf("%d/sec", q.limiterRate),
+		fmt.Sprintf("%d/sec", q.cfg.LimiterRate),
 		"--hashlimit-burst",
-		fmt.Sprintf("%d", q.limiterBurst),
+		fmt.Sprintf("%d", q.cfg.LimiterBurst),
 		"--hashlimit-htable-size",
-		fmt.Sprintf("%d", q.limiterCacheSize),
+		fmt.Sprintf("%d", q.cfg.LimiterCacheSize),
 		"--hashlimit-htable-expire",
-		fmt.Sprintf("%d", q.limiterBucketTTL.Milliseconds()),
+		fmt.Sprintf("%d", q.cfg.LimiterBucketTTL.Milliseconds()),
 		"-j",
 		"DROP",
 	); err != nil {
@@ -269,8 +249,8 @@ func (q *Queue) ipTablesUp() error {
 		"NFQUEUE",
 		"--queue-bypass",
 	}
-	if q.qcount > 1 {
-		medsArgs = append(medsArgs, "--queue-balance", fmt.Sprintf("0:%d", q.qcount-1))
+	if q.cfg.ReadersCount > 1 {
+		medsArgs = append(medsArgs, "--queue-balance", fmt.Sprintf("0:%d", q.cfg.ReadersCount-1))
 	}
 	if err := ipt.AppendUnique("filter", MedsChainName, medsArgs...); err != nil {
 		return err

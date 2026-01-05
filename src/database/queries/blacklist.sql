@@ -9,17 +9,6 @@ VALUES (@subnet);
 DELETE FROM subnet_blacklist
 WHERE subnet = @subnet;
 
--- name: GetAllBlackListDomains :many
-SELECT * FROM domain_blacklist;
-
--- name: UpsertBlackListDomain :exec
-INSERT INTO domain_blacklist (domain)
-VALUES (@domain);
-
--- name: RemoveBlackListDomain :exec
-DELETE FROM domain_blacklist
-WHERE domain = @domain;
-
 -- name: GetAllBlackListCountries :many
 SELECT * FROM country_blacklist;
 

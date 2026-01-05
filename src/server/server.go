@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/cnaize/meds/src/api"
+	"github.com/cnaize/meds/src/config"
 	"github.com/cnaize/meds/src/database"
 	"github.com/cnaize/meds/src/types"
 )
@@ -19,25 +20,21 @@ type Server struct {
 }
 
 func NewServer(
-	addr,
-	username,
-	password string,
+	cfg *config.Config,
 	db *database.Database,
 	subnetWhiteList *types.SubnetList,
 	subnetBlackList *types.SubnetList,
-	domainWhiteList *types.DomainList,
-	domainBlackList *types.DomainList,
 	countryBlackList *types.CountryList,
 ) *Server {
 	r := gin.New()
-	r.Use(gin.BasicAuth(gin.Accounts{username: password}), gin.Recovery())
+	r.Use(gin.BasicAuth(gin.Accounts{cfg.Username: cfg.Password}), gin.Recovery())
 
-	api.Register(r, db, subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, countryBlackList)
+	api.Register(r, db, subnetWhiteList, subnetBlackList, countryBlackList)
 
 	return &Server{
 		router: r,
 		server: &http.Server{
-			Addr:    addr,
+			Addr:    cfg.APIServerAddr,
 			Handler: r,
 		},
 	}

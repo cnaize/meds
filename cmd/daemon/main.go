@@ -82,57 +82,29 @@ func main() {
 	logger.Raw().Info().Msg("Running Meds...")
 
 	// create database
-	db := database.NewDatabase(cfg.DBFilePath, logger)
+	db := database.NewDatabase(&cfg, logger)
 	if err := db.Init(mainCtx); err != nil {
 		logger.Raw().Fatal().Err(err).Msg("database init failed")
 	}
 
 	// load white/black lists
-	subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, countryBlackList, err := loadWhiteBlackLists(mainCtx, db)
+	subnetWhiteList, subnetBlackList, countryBlackList, err := loadWhiteBlackLists(mainCtx, db)
 	if err != nil {
 		logger.Raw().Fatal().Err(err).Msg("white/black lists load")
 	}
 
 	// create filters
-	filters := newFilters(
-		cfg,
-		logger,
-		subnetWhiteList,
-		subnetBlackList,
-		domainWhiteList,
-		domainBlackList,
-		countryBlackList,
-	)
+	filters := newFilters(&cfg, logger, subnetWhiteList, subnetBlackList, countryBlackList)
 
 	// create queue
-	q := core.NewQueue(
-		cfg.ReadersCount,
-		cfg.WorkersCount,
-		cfg.ReaderQLen,
-		cfg.LimiterRate,
-		cfg.LimiterBurst,
-		cfg.LimiterCacheSize,
-		cfg.LimiterBucketTTL,
-		filters,
-		logger,
-	)
+	q := core.NewQueue(&cfg, filters, logger)
 	if err := q.Load(mainCtx); err != nil {
 		logger.Raw().Fatal().Err(err).Msg("queue load failed")
 	}
 	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
 	// create server
-	api := server.NewServer(
-		cfg.APIServerAddr,
-		cfg.Username,
-		cfg.Password,
-		db,
-		subnetWhiteList,
-		subnetBlackList,
-		domainWhiteList,
-		domainBlackList,
-		countryBlackList,
-	)
+	api := server.NewServer(&cfg, db, subnetWhiteList, subnetBlackList, countryBlackList)
 
 	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(graceful.NewLogger()))
 	m.AddRunningJob(func(ctx context.Context) error {
@@ -178,30 +150,25 @@ func main() {
 }
 
 func loadWhiteBlackLists(ctx context.Context, db *database.Database) (
-	*types.SubnetList,
-	*types.SubnetList,
-	*types.DomainList,
-	*types.DomainList,
-	*types.CountryList,
-	error,
+	*types.SubnetList, *types.SubnetList, *types.CountryList, error,
 ) {
 	// load subnet whitelist
 	subnetWhiteList := types.NewSubnetList()
 	snWhiteList, err := db.Q.GetAllWhiteListSubnets(ctx, db.DB)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("subnet whitelist get: %w", err)
+		return nil, nil, nil, fmt.Errorf("subnet whitelist get: %w", err)
 	}
 	if len(snWhiteList) > 0 {
 		subnets, err := get.Subnets(snWhiteList)
 		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("subnet whitelist parse: %w", err)
+			return nil, nil, nil, fmt.Errorf("subnet whitelist parse: %w", err)
 		}
 		if err := subnetWhiteList.Upsert(subnets); err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("subnet whitelist upsert: %w", err)
+			return nil, nil, nil, fmt.Errorf("subnet whitelist upsert: %w", err)
 		}
 	} else {
 		if err := prefillWhiteList(ctx, db, subnetWhiteList); err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("subnet whitelist prefill: %w", err)
+			return nil, nil, nil, fmt.Errorf("subnet whitelist prefill: %w", err)
 		}
 	}
 
@@ -209,46 +176,27 @@ func loadWhiteBlackLists(ctx context.Context, db *database.Database) (
 	subnetBlackList := types.NewSubnetList()
 	snBlackList, err := db.Q.GetAllBlackListSubnets(ctx, db.DB)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("subnet blacklist get: %w", err)
+		return nil, nil, nil, fmt.Errorf("subnet blacklist get: %w", err)
 	}
 	subnets, err := get.Subnets(snBlackList)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("subnet blacklist parse: %w", err)
+		return nil, nil, nil, fmt.Errorf("subnet blacklist parse: %w", err)
 	}
 	if err := subnetBlackList.Upsert(subnets); err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("subnet blacklist upsert: %w", err)
+		return nil, nil, nil, fmt.Errorf("subnet blacklist upsert: %w", err)
 	}
 
-	// load domain whitelist
-	domainWhiteList := types.NewDomainList()
-	dmWhiteList, err := db.Q.GetAllWhiteListDomains(ctx, db.DB)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("domain whitelist get: %w", err)
-	}
-	if err := domainWhiteList.Upsert(dmWhiteList); err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("domain whitelist upsert: %w", err)
-	}
-
-	// load domain whitelist
-	domainBlackList := types.NewDomainList()
-	dmBlackList, err := db.Q.GetAllBlackListDomains(ctx, db.DB)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("domain blacklist get: %w", err)
-	}
-	if err := domainBlackList.Upsert(dmBlackList); err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("domain blacklist upsert: %w", err)
-	}
-
+	// load country blacklist
 	countryBlackList := types.NewCountryList()
 	crBlackList, err := db.Q.GetAllBlackListCountries(ctx, db.DB)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("country blacklist get: %w", err)
+		return nil, nil, nil, fmt.Errorf("country blacklist get: %w", err)
 	}
 	if err := countryBlackList.Upsert(crBlackList); err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("country blacklist upsert: %w", err)
+		return nil, nil, nil, fmt.Errorf("country blacklist upsert: %w", err)
 	}
 
-	return subnetWhiteList, subnetBlackList, domainWhiteList, domainBlackList, countryBlackList, nil
+	return subnetWhiteList, subnetBlackList, countryBlackList, nil
 }
 
 func prefillWhiteList(ctx context.Context, db *database.Database, subnetWhiteList *types.SubnetList) error {
@@ -274,13 +222,10 @@ func prefillWhiteList(ctx context.Context, db *database.Database, subnetWhiteLis
 	return nil
 }
 
-func newFilters(
-	cfg config.Config,
+func newFilters(cfg *config.Config,
 	logger *logger.Logger,
 	subnetWhiteList *types.SubnetList,
 	subnetBlackList *types.SubnetList,
-	domainWhiteList *types.DomainList,
-	domainBlackList *types.DomainList,
 	countryBlacklist *types.CountryList,
 ) []filter.Filter {
 	// geofilter.IPLocate is responsible for the ASNList updates
@@ -311,11 +256,7 @@ func newFilters(
 		asnfilter.NewSpamhaus([]string{
 			"https://www.spamhaus.org/drop/asndrop.json",
 		}, logger, asnList),
-		// domain/sni whitelist
-		domainfilter.NewWhiteList(logger, domainWhiteList),
-		// domain/sni blacklist
-		domainfilter.NewBlackList(logger, domainBlackList),
-		// domain/sni filters
+		// dns/sni filters
 		domainfilter.NewStevenBlack([]string{
 			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
 		}, logger),

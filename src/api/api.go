@@ -30,8 +30,6 @@ import (
 var (
 	subnetWhiteListMu  sync.Mutex
 	subnetBlackListMu  sync.Mutex
-	domainWhiteListMu  sync.Mutex
-	domainBlackListMu  sync.Mutex
 	countryBlackListMu sync.Mutex
 )
 
@@ -40,8 +38,6 @@ func Register(
 	db *database.Database,
 	subnetWhiteList *types.SubnetList,
 	subnetBlackList *types.SubnetList,
-	domainWhiteList *types.DomainList,
-	domainBlackList *types.DomainList,
 	countryBlackList *types.CountryList,
 ) {
 	// register prometheus metrics
@@ -62,12 +58,6 @@ func Register(
 	snWhiteList.GET("/:subnet", CheckWhiteListSubnet(subnetWhiteList, &subnetWhiteListMu))
 	snWhiteList.POST("", UpsertWhiteListSubnets(subnetWhiteList, &subnetWhiteListMu, db))
 	snWhiteList.DELETE("", RemoveWhiteListSubnets(subnetWhiteList, &subnetWhiteListMu, db))
-	// register domain whitelist
-	dmWhiteList := whitelist.Group("/domains")
-	dmWhiteList.GET("", GetWhiteListDomains(domainWhiteList, &domainWhiteListMu))
-	dmWhiteList.GET("/:domain", CheckWhiteListDomain(domainWhiteList, &domainWhiteListMu))
-	dmWhiteList.POST("", UpsertWhiteListDomains(domainWhiteList, &domainWhiteListMu, db))
-	dmWhiteList.DELETE("", RemoveWhiteListDomains(domainWhiteList, &domainWhiteListMu, db))
 
 	// register blacklist api
 	blacklist := root.Group("/blacklist")
@@ -77,12 +67,6 @@ func Register(
 	snBlackList.GET("/:subnet", CheckBlackListSubnet(subnetBlackList, &subnetBlackListMu))
 	snBlackList.POST("", UpsertBlackListSubnets(subnetBlackList, &subnetBlackListMu, db))
 	snBlackList.DELETE("", RemoveBlackListSubnets(subnetBlackList, &subnetBlackListMu, db))
-	// register domain blacklist
-	dmBlackList := blacklist.Group("/domains")
-	dmBlackList.GET("", GetBlackListDomains(domainBlackList, &domainBlackListMu))
-	dmBlackList.GET("/:domain", CheckBlackListDomain(domainBlackList, &domainBlackListMu))
-	dmBlackList.POST("", UpsertBlackListDomains(domainBlackList, &domainBlackListMu, db))
-	dmBlackList.DELETE("", RemoveBlackListDomains(domainBlackList, &domainBlackListMu, db))
 	// register country blacklist
 	crBlackList := blacklist.Group("/countries")
 	crBlackList.GET("", GetBlackListCountries(countryBlackList, &countryBlackListMu))

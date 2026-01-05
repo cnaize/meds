@@ -141,125 +141,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/blacklist/domains": {
-            "get": {
-                "description": "get all blacklisted domains",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "blacklist"
-                ],
-                "summary": "Get blacklisted domains",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.GetDomainsResp"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "upsert domains to blacklist",
-                "consumes": [
-                    "application/json"
-                ],
-                "tags": [
-                    "blacklist"
-                ],
-                "summary": "Upsert blacklisted domains",
-                "parameters": [
-                    {
-                        "description": "domains to add",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.UpsertDomainsReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted"
-                    },
-                    "400": {
-                        "description": "Bad Request"
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity"
-                    },
-                    "500": {
-                        "description": "Internal Server Error"
-                    }
-                }
-            },
-            "delete": {
-                "description": "remove domains from blacklist",
-                "consumes": [
-                    "application/json"
-                ],
-                "tags": [
-                    "blacklist"
-                ],
-                "summary": "Remove blacklisted domains",
-                "parameters": [
-                    {
-                        "description": "domains to remove",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.RemoveDomainsReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted"
-                    },
-                    "400": {
-                        "description": "Bad Request"
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity"
-                    },
-                    "500": {
-                        "description": "Internal Server Error"
-                    }
-                }
-            }
-        },
-        "/v1/blacklist/domains/{domain}": {
-            "get": {
-                "description": "check if a domain is blacklisted",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "blacklist"
-                ],
-                "summary": "Check blacklisted domain",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "domain to check",
-                        "name": "domain",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.CheckDomainResp"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/blacklist/subnets": {
             "get": {
                 "description": "get all blacklisted subnets",
@@ -378,125 +259,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request"
-                    }
-                }
-            }
-        },
-        "/v1/whitelist/domains": {
-            "get": {
-                "description": "get all whitelisted domains",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "whitelist"
-                ],
-                "summary": "Get whitelisted domains",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.GetDomainsResp"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "upsert domains to whitelist",
-                "consumes": [
-                    "application/json"
-                ],
-                "tags": [
-                    "whitelist"
-                ],
-                "summary": "Upsert whitelisted domains",
-                "parameters": [
-                    {
-                        "description": "domains to add",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.UpsertDomainsReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted"
-                    },
-                    "400": {
-                        "description": "Bad Request"
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity"
-                    },
-                    "500": {
-                        "description": "Internal Server Error"
-                    }
-                }
-            },
-            "delete": {
-                "description": "remove domains from whitelist",
-                "consumes": [
-                    "application/json"
-                ],
-                "tags": [
-                    "whitelist"
-                ],
-                "summary": "Remove whitelisted domains",
-                "parameters": [
-                    {
-                        "description": "domains to remove",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.RemoveDomainsReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted"
-                    },
-                    "400": {
-                        "description": "Bad Request"
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity"
-                    },
-                    "500": {
-                        "description": "Internal Server Error"
-                    }
-                }
-            }
-        },
-        "/v1/whitelist/domains/{domain}": {
-            "get": {
-                "description": "check if a domain is whitelisted",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "whitelist"
-                ],
-                "summary": "Check whitelisted domain",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "domain to check",
-                        "name": "domain",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.CheckDomainResp"
-                        }
                     }
                 }
             }
@@ -633,14 +395,6 @@ const docTemplate = `{
                 }
             }
         },
-        "api.CheckDomainResp": {
-            "type": "object",
-            "properties": {
-                "found": {
-                    "type": "boolean"
-                }
-            }
-        },
         "api.CheckSubnetResp": {
             "type": "object",
             "properties": {
@@ -660,21 +414,6 @@ const docTemplate = `{
                     "example": [
                         "fr",
                         "de"
-                    ]
-                }
-            }
-        },
-        "api.GetDomainsResp": {
-            "type": "object",
-            "properties": {
-                "domains": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "bad.com",
-                        "dead.com"
                     ]
                 }
             }
@@ -709,21 +448,6 @@ const docTemplate = `{
                 }
             }
         },
-        "api.RemoveDomainsReq": {
-            "type": "object",
-            "properties": {
-                "domains": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "bad.com",
-                        "dead.com"
-                    ]
-                }
-            }
-        },
         "api.RemoveSubnetsReq": {
             "type": "object",
             "properties": {
@@ -750,21 +474,6 @@ const docTemplate = `{
                     "example": [
                         "fr",
                         "de"
-                    ]
-                }
-            }
-        },
-        "api.UpsertDomainsReq": {
-            "type": "object",
-            "properties": {
-                "domains": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "bad.com",
-                        "dead.com"
                     ]
                 }
             }

@@ -9,33 +9,6 @@ import (
 	"context"
 )
 
-const getAllWhiteListDomains = `-- name: GetAllWhiteListDomains :many
-SELECT domain FROM domain_whitelist
-`
-
-func (q *Queries) GetAllWhiteListDomains(ctx context.Context, db DBTX) ([]string, error) {
-	rows, err := db.QueryContext(ctx, getAllWhiteListDomains)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var domain string
-		if err := rows.Scan(&domain); err != nil {
-			return nil, err
-		}
-		items = append(items, domain)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getAllWhiteListSubnets = `-- name: GetAllWhiteListSubnets :many
 SELECT subnet FROM subnet_whitelist
 `
@@ -63,16 +36,6 @@ func (q *Queries) GetAllWhiteListSubnets(ctx context.Context, db DBTX) ([]string
 	return items, nil
 }
 
-const removeWhiteListDomain = `-- name: RemoveWhiteListDomain :exec
-DELETE FROM domain_whitelist
-WHERE domain = ?1
-`
-
-func (q *Queries) RemoveWhiteListDomain(ctx context.Context, db DBTX, domain string) error {
-	_, err := db.ExecContext(ctx, removeWhiteListDomain, domain)
-	return err
-}
-
 const removeWhiteListSubnet = `-- name: RemoveWhiteListSubnet :exec
 DELETE FROM subnet_whitelist
 WHERE subnet = ?1
@@ -80,16 +43,6 @@ WHERE subnet = ?1
 
 func (q *Queries) RemoveWhiteListSubnet(ctx context.Context, db DBTX, subnet string) error {
 	_, err := db.ExecContext(ctx, removeWhiteListSubnet, subnet)
-	return err
-}
-
-const upsertWhiteListDomain = `-- name: UpsertWhiteListDomain :exec
-INSERT INTO domain_whitelist (domain)
-VALUES (?1)
-`
-
-func (q *Queries) UpsertWhiteListDomain(ctx context.Context, db DBTX, domain string) error {
-	_, err := db.ExecContext(ctx, upsertWhiteListDomain, domain)
 	return err
 }
 
