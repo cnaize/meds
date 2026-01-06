@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.0.2-blue)
+![Version](https://img.shields.io/badge/version-v1.1.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -11,7 +11,7 @@
 # Meds: net healing  
 > Intelligent firewall in Go
 
-It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering to block malicious traffic in real-time. Once a connection is verified, Meds offloads it back to the kernel using **Conntrack marks** for maximum throughput.
+It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering to block malicious traffic in real-time. Once a connection is checked, the engine "teaches" the Linux kernel to handle it. By assigning **Conntrack marks**, Meds offloads flows back to the kernel space, achieving maximum wire-speed throughput and minimal CPU overhead.
 
 *Designed to cure your network from malicious traffic*
 
@@ -63,7 +63,7 @@ Usage of ./meds:
   -rate-limiter-cache-size uint
     	rate limiter cache size (all buckets) (default 100000)
   -rate-limiter-cache-ttl duration
-    	rate limiter cache ttl (per bucket) (default 3m0s)
+    	rate limiter cache ttl (per bucket) (default 5m0s)
   -rate-limiter-rate uint
     	max packets per second (per ip) (default 3000)
   -reader-queue-len uint
@@ -99,95 +99,62 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 ## 🔍 How It Works
 ```text
-                    PACKET
-                      │
-┌─────────────────────▼─────────────────────┐
-│ KERNEL SPACE (Netfilter / Mangle)         │
-│ ───────────────────────────────────────── │
-│ [Restore Connmark] ──► [Already Marked?] ─┼──┐
-└─────────────────────┬─────────────────────┘  │
-                      │ No (Slow Path)         │ Yes
-  ┌───────────────────▼───────────────────┐    │ (Fast Path)
-  │ USER SPACE (Meds Firewall)            │    │
-  │ ───────────────────────────────────── │    │
-  │   1. Global IP Whitelist              │    │
-  │   2. Rate Limiter (per source IP)     │    │
-  │   3. Global IP Blacklist              │    │
-  │   4. IP Filters                       │    │
-  │   5. Geo Filters                      │    │
-  │   6. ASN Filters                      │    │
-  │   7. Global Domain/SNI Whitelist      │    │
-  │   8. Global Domain/SNI Blacklist      │    │
-  │   9. Domain/SNI Filters               │    │
-  │  10. TLS JA3 Filters                  │    │
-  └──────────────────┬────────────────────┘    │
-                     │                         │
-  ┌──────────────────▼────────────────────┐    │
-  │ DECISION ENGINE                       │    │
-  │ ───────────────────────────────────── │    │
-  │   [DROP]   ──► Discard packet         │    │
-  │   [ACCEPT] ──► Pass once             ─┼──┐ │
-  │   [MARK]   ──► Set Connmark + ACCEPT ─┼──┤ │
-  └───────────────────────────────────────┘  │ │
-                                             ▼ ▼
-                                       TRAFFIC ALLOWED
+                         PACKET
+                           │
+┌──────────────────────────▼──────────────────────────┐
+│ KERNEL SPACE (iptables / Netfilter)                 │
+│ ─────────────────────────────────────────────────── │
+│ [1. Restore Connmark]             ◄─────────────────┼───────┐
+│                                                     │       │
+│ [2. White / Block Check]          ──► ACCEPT ───────┼───┐   │
+│      (Marks: 0x100000 / 0x200000) ──► DROP          │   │   │
+│                                                     │   │   │
+│ [3. Rate Limiter] (per source IP) ──► DROP if flood │   │   │
+│                                                     │   │   │
+│ [4. Trusted Check]                ──► ACCEPT ───────┼───┤   │
+│      (Mark: 0x400000)                               │   │   │
+│                                                     │   │   │
+│ [5. Unclassified] (NFQUEUE)       ──► to User Space │   │   │
+│      (First 10 pkts / Balance 0:N)                  │   │   │
+└──────────────────────────────────────────┼──────────┘   │   │
+                                           │              │   │
+┌──────────────────────────────────────────▼──┐           │   │
+│ USER SPACE (Meds Firewall)                  │           │   │
+│ ─────────────────────────────────────────── │           │   │
+│   1. L3/L4 Filters (IP, Geo, ASN)           │           │   │
+│   2. L7 Inspection (DNS, SNI, TLS JA3)      │           │   │
+│                                             │           │   │
+│ [DECISION ENGINE]                           │           │   │
+│   * Set Verdict     (DROP / ACCEPT) ────────┼───────────┤   │
+│   * Update Connmark (White / Block / Trust) ┼──► [MARK] ────┘
+└─────────────────────────────────────────────┘           │
+                                                          ▼
+                                                   TRAFFIC ALLOWED
 ```
 
-- **Hybrid Traffic Flow**  
-  Meds optimizes traffic by splitting it into two paths:
-  - **Fast Path (Kernel)**: packets belonging to established/trusted connections (marked via `CONNMARK`) are processed entirely by the Linux kernel.  
-  - **Inspection Path (User Space)**: new or unmarked packets are sent to Meds via NFQUEUE.  
+- **Pre-Limit Bypass**: White Listed (`0x100000`) and Block Listed (`0x200000`) traffic is handled by the kernel immediately. This ensures that verified legitimate traffic has zero overhead from rate limiters, while known threats are dropped at the earliest possible stage.
 
-- **Classification pipeline**  
-  Packets are processed according to the following pipeline:
-  - **Global IP Whitelist** — immediate pass for trusted source IPs
-  - **Rate Limiter** — protects system resources by limiting packet rate per source IP
-  - **Global IP Blacklist** — immediate block for malicious source IPs
-  - **IP Filters** — applies granular IP-based filtering rules
-  - **Geo Filters** — filters traffic by country of origin using ASN metadata
-  - **ASN Filters** — checks Autonomous System reputation against blacklists
-  - **Global Domain/SNI Whitelist** — permits trusted domains extracted from DNS or TLS SNI
-  - **Global Domain/SNI Blacklist** — blocks malicious domains from DNS or TLS SNI
-  - **Domain/SNI Filters** — applies granular domain-based filtering rules
-  - **TLS JA3 Filters** — detects malicious clients via TLS fingerprinting
+- **Global Protection**: All unclassified or non-whitelisted traffic is subject to a kernel-level `hashlimit` (PPS per source IP). This acts as a primary shield against volumetric DDoS attacks, protecting the User Space engine from exhaustion.
 
-- **Decision engine**  
-  - **DROP** → packet is malicious, discarded immediately  
-  - **MARK** → marks the connection as trusted in the kernel via Conntrack for wire-speed handling  
-  - **ACCEPT** → packet is safe, passed to kernel stack  
+- **Stateful Acceleration**: Once a connection is verified by Meds as Trusted (`0x400000`), it is offloaded to the kernel's fast path. Subsequent packets bypass deep inspection while remaining under the protection of the rate limiter.
 
-- **Metrics & logging**  
-  Every decision is counted and exported for monitoring and alerting.  
-  Metrics are Prometheus-compatible and can be visualized in Grafana.  
-  All events are asynchronously logged to minimize packet processing latency.  
+- **Deep Inspection**: Only new or unclassified traffic (the "Decision Phase", limited to the **first 10 packets** via `connbytes`) is sent to the Go engine for deep L3/L4/L7 DPI analysis.
 
 ---
 
 ## ✨ Key Features
 
-- **NFQUEUE-based packet interception**  
-  Uses Linux Netfilter queues to copy inbound packets into user space with minimal overhead, only for the "Decision Phase" of a connection.
+- **Hybrid Kernel/User-space Processing**  
+  Meds utilizes a stateful marking architecture. It "teaches" the Linux kernel how to handle specific flows by assigning **Conntrack marks**, achieving wire-speed performance for established connections.
 
-- **Hybrid Processing (Conntrack Acceleration)**  
-  Uses **Conntrack marks** to offload trusted connections. Once a flow is validated in user space, it is marked in the kernel's connection tracking table. Subsequent packets of that flow stay in the kernel, achieving wire-speed performance.
+- **Intelligent NFQUEUE Balancing**  
+  Intercepts traffic using `NFQUEUE` with `fanout` and `bypass` options, ensuring multi-core scaling and system stability even if the user-space process is restarted.
 
-- **Lock-free core**  
-  Meds itself does not use any mutexes — all filtering, counters, and rate-limiters use atomic operations.
+- **Lock-free Core Architecture**  
+  The core engine is built for high-concurrency performance: no mutexes in the hot path. All filtering, counters, and rate-limiters utilize atomic operations.
 
-- **Decoupled reader / worker / logger model**  
-  - Readers drain NFQUEUE as fast as possible
-  - Workers perform CPU-intensive filtering
-  - Logger uses [zerolog](https://github.com/rs/zerolog) with async worker-based logging
-
-- **Fast packet parsing with [gopacket](https://github.com/google/gopacket)**  
-  Parses traffic efficiently (`lazy` and `no copy` modes enabled).
-
-- **Efficient lookups**  
-  Uses [radix tree](https://github.com/armon/go-radix) and [bart](https://github.com/gaissmai/bart) for IP/domain matching at scale.
-
-- **Rate Limiting per IP**  
-  Uses token bucket algorithm to limit burst and sustained traffic per source IP.  
-  Protects against high-frequency floods (SYN, DNS, ICMP, or generic packet floods).
+- **Multi-layer Rate Limiting**  
+  Combines **Kernel-level protection** (fast `hashlimit` PPS limiting) with **User-space logic** (token bucket) for sophisticated traffic shaping and flood protection.
 
 - **Blacklist-based filtering**  
   - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)
@@ -207,7 +174,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   Enables real-time blocking of malicious TLS clients such as malware beacons, scanners, or C2 frameworks.
 
 - **HTTP API for runtime configuration**  
-  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP, Domain, or Country entries in global white/black lists.  
+  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP or Country entries in global white/black lists.  
   Auth via BasicAuth using `MEDS_USERNAME` / `MEDS_PASSWORD`.
 
 - **Prometheus metrics export**  
@@ -219,33 +186,27 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
   Metrics are available at `/metrics` via the built-in API server, compatible with Prometheus scrape targets.
 
-- **Extensible design**  
-  Modular architecture allows adding new filters.
-
 ---
 
 ## 📊 Example Metrics (Prometheus)
 
 ```text
-# HELP meds_core_connections_trusted_total Total number of trusted connections
-# TYPE meds_core_connections_trusted_total counter
-meds_core_connections_trusted_total{reason="trusted packet"} 2843
-
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="default"} 20832
-meds_core_packets_accepted_total{filter="ip",reason="WhiteList"} 668
+meds_core_packets_accepted_total{filter="empty",reason="default"} 12021
+meds_core_packets_accepted_total{filter="empty",reason="trusted packet"} 420
+meds_core_packets_accepted_total{filter="ip",reason="WhiteList"} 139
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 130
-meds_core_packets_dropped_total{filter="geo",reason="IPLocate"} 22
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 7980
-meds_core_packets_dropped_total{filter="rate",reason="Limiter"} 11
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 263
+meds_core_packets_dropped_total{filter="domain",reason="StevenBlack"} 3
+meds_core_packets_dropped_total{filter="geo",reason="IPLocate"} 43
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 1443
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 29653
+meds_core_packets_processed_total 14332
 ```
 
 ---
