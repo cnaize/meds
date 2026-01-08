@@ -20,8 +20,7 @@ import (
 const MedsChainName = "MEDS"
 
 const (
-	ConnMarkWhiteList uint32 = 0x100000 << iota
-	ConnMarkBlockList
+	ConnMarkBlockList uint32 = 0x100000 << iota
 	ConnMarkTrustList
 )
 
@@ -93,7 +92,7 @@ func (q *Queue) Run(ctx context.Context) error {
 	}
 
 	// up iptables
-	if err := q.ipTablesUp(); err != nil {
+	if err := q.iptablesUp(); err != nil {
 		return fmt.Errorf("iptables up: %w", err)
 	}
 
@@ -142,15 +141,14 @@ func (q *Queue) Close() error {
 	}
 
 	// down iptables
-	if err := q.ipTablesDown(); err != nil {
+	if err := q.iptablesDown(); err != nil {
 		errs = errors.Join(errs, fmt.Errorf("iptables down: %w", err))
 	}
 
 	return errs
 }
 
-func (q *Queue) ipTablesUp() error {
-	whiteListMark := "0x" + strconv.FormatUint(uint64(ConnMarkWhiteList), 16)
+func (q *Queue) iptablesUp() error {
 	blockListMark := "0x" + strconv.FormatUint(uint64(ConnMarkBlockList), 16)
 	trustListMark := "0x" + strconv.FormatUint(uint64(ConnMarkTrustList), 16)
 
@@ -159,19 +157,8 @@ func (q *Queue) ipTablesUp() error {
 		return fmt.Errorf("iptables new: %w", err)
 	}
 
-	if err := ipt.AppendUnique(
-		"mangle",
-		"PREROUTING",
-		"-m",
-		"comment",
-		"--comment",
-		MedsChainName,
-		"-j",
-		"CONNMARK",
-		"--restore-mark",
-		"--mask",
-		"0xFFFFFFFF"); err != nil {
-		return err
+	if err := manageMarkRules(ipt.AppendUnique); err != nil {
+		return fmt.Errorf("manage mark rules: %w", err)
 	}
 
 	if ok, err := ipt.ChainExists("filter", MedsChainName); err != nil {
@@ -188,43 +175,7 @@ func (q *Queue) ipTablesUp() error {
 		"-m",
 		"mark",
 		"--mark",
-		whiteListMark+"/"+whiteListMark,
-		"-j",
-		"ACCEPT",
-	); err != nil {
-		return err
-	}
-
-	if err := ipt.AppendUnique(
-		"filter",
-		MedsChainName,
-		"-m",
-		"mark",
-		"--mark",
 		blockListMark+"/"+blockListMark,
-		"-j",
-		"DROP",
-	); err != nil {
-		return err
-	}
-
-	if err := ipt.AppendUnique(
-		"filter",
-		MedsChainName,
-		"-m",
-		"hashlimit",
-		"--hashlimit-name",
-		"meds-rate",
-		"--hashlimit-mode",
-		"srcip",
-		"--hashlimit-above",
-		fmt.Sprintf("%d/sec", q.cfg.LimiterRate),
-		"--hashlimit-burst",
-		fmt.Sprintf("%d", q.cfg.LimiterBurst),
-		"--hashlimit-htable-size",
-		fmt.Sprintf("%d", q.cfg.LimiterCacheSize),
-		"--hashlimit-htable-expire",
-		fmt.Sprintf("%d", q.cfg.LimiterBucketTTL.Milliseconds()),
 		"-j",
 		"DROP",
 	); err != nil {
@@ -236,7 +187,7 @@ func (q *Queue) ipTablesUp() error {
 		"mark",
 		"!",
 		"--mark",
-		trustListMark + "/" + trustListMark,
+		trustListMark,
 		"-m",
 		"connbytes",
 		"--connbytes-mode",
@@ -259,13 +210,25 @@ func (q *Queue) ipTablesUp() error {
 	return ipt.AppendUnique("filter", "INPUT", "-j", MedsChainName)
 }
 
-func (q *Queue) ipTablesDown() error {
+func (q *Queue) iptablesDown() error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return fmt.Errorf("iptables new: %w", err)
 	}
 
-	if err := ipt.DeleteIfExists(
+	if err := manageMarkRules(ipt.DeleteIfExists); err != nil {
+		return fmt.Errorf("manage mark rules: %w", err)
+	}
+
+	if err := ipt.DeleteIfExists("filter", "INPUT", "-j", MedsChainName); err != nil {
+		return err
+	}
+
+	return ipt.ClearAndDeleteChain("filter", MedsChainName)
+}
+
+func manageMarkRules(action func(table, chain string, rulespec ...string) error) error {
+	if err := action(
 		"mangle",
 		"PREROUTING",
 		"-m",
@@ -276,13 +239,22 @@ func (q *Queue) ipTablesDown() error {
 		"CONNMARK",
 		"--restore-mark",
 		"--mask",
-		"0xFFFFFFFF"); err != nil {
+		"0xFFFFFFFF",
+	); err != nil {
 		return err
 	}
 
-	if err := ipt.DeleteIfExists("filter", "INPUT", "-j", MedsChainName); err != nil {
-		return fmt.Errorf("iptables common: %w", err)
-	}
-
-	return ipt.ClearAndDeleteChain("filter", MedsChainName)
+	return action(
+		"mangle",
+		"POSTROUTING",
+		"-m",
+		"comment",
+		"--comment",
+		MedsChainName,
+		"-j",
+		"CONNMARK",
+		"--save-mark",
+		"--mask",
+		"0xFFFFFFFF",
+	)
 }

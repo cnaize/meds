@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.1.0-blue)
+![Version](https://img.shields.io/badge/version-v1.1.1-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -99,46 +99,42 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 ## 🔍 How It Works
 ```text
-                         PACKET
-                           │
-┌──────────────────────────▼──────────────────────────┐
-│ KERNEL SPACE (iptables / Netfilter)                 │
-│ ─────────────────────────────────────────────────── │
-│ [1. Restore Connmark]             ◄─────────────────┼───────┐
-│                                                     │       │
-│ [2. White / Block Check]          ──► ACCEPT ───────┼───┐   │
-│      (Marks: 0x100000 / 0x200000) ──► DROP          │   │   │
-│                                                     │   │   │
-│ [3. Rate Limiter] (per source IP) ──► DROP if flood │   │   │
-│                                                     │   │   │
-│ [4. Trusted Check]                ──► ACCEPT ───────┼───┤   │
-│      (Mark: 0x400000)                               │   │   │
-│                                                     │   │   │
-│ [5. Unclassified] (NFQUEUE)       ──► to User Space │   │   │
-│      (First 10 pkts / Balance 0:N)                  │   │   │
-└──────────────────────────────────────────┼──────────┘   │   │
-                                           │              │   │
-┌──────────────────────────────────────────▼──┐           │   │
-│ USER SPACE (Meds Firewall)                  │           │   │
-│ ─────────────────────────────────────────── │           │   │
-│   1. L3/L4 Filters (IP, Geo, ASN)           │           │   │
-│   2. L7 Inspection (DNS, SNI, TLS JA3)      │           │   │
-│                                             │           │   │
-│ [DECISION ENGINE]                           │           │   │
-│   * Set Verdict     (DROP / ACCEPT) ────────┼───────────┤   │
-│   * Update Connmark (White / Block / Trust) ┼──► [MARK] ────┘
-└─────────────────────────────────────────────┘           │
-                                                          ▼
-                                                   TRAFFIC ALLOWED
+                  PACKET
+                    │
+┌───────────────────▼───────────────────┐
+│ KERNEL SPACE (iptables / Netfilter)   │
+│ ───────────────────────────────────── │
+│  1. Restore Connmark                ◄─┼──┐
+│                                       │  │
+│  2. Check Block List  ──► DROP        │  │
+│      (Mark: 0x100000)                 │  │
+│                                       │  │
+│  3. Check Trust List  ──► ACCEPT      │  │
+│      (Mark: 0x200000)                 │  │
+│                                       │  │
+│  4. First 10 packets  ──┐             │  │
+│                         │             │  │
+│  5. Save Connmark       │             │  │
+└─────────────────────────┼─────────────┘  │
+                          │                │
+┌─────────────────────────▼─────────────┐  │
+│ USER SPACE (Meds Firewall)            │  │
+│ ───────────────────────────────────── │  │
+│  1. Rate Limiter (per source IP)      │  │
+│  2. L3/L4 Filters (IP, Geo, ASN)      │  │
+│  3. L7 Inspection (DNS, SNI, TLS JA3) │  │
+│                                       │  │
+│ [DECISION ENGINE]                     │  │
+│  * BLOCK: Mark 0x100000  ──► REPEAT ──┼──┘
+│  * TRUST: Mark 0x200000  ──► ACCEPT   │
+└───────────────────────────────────────┘
 ```
 
-- **Pre-Limit Bypass**: White Listed (`0x100000`) and Block Listed (`0x200000`) traffic is handled by the kernel immediately. This ensures that verified legitimate traffic has zero overhead from rate limiters, while known threats are dropped at the earliest possible stage.
+- **Early Drop**: Blocked traffic (`0x100000`) is handled by the kernel immediately. This ensures that known threats are dropped at the earliest possible stage, eliminating unnecessary context switches and user-space overhead.
 
-- **Global Protection**: All unclassified or non-whitelisted traffic is subject to a kernel-level `hashlimit` (PPS per source IP). This acts as a primary shield against volumetric DDoS attacks, protecting the User Space engine from exhaustion.
+- **Stateful Acceleration**: Once a connection is verified as Trusted (`0x200000`), it is offloaded to the kernel's fast path. Subsequent packets in the flow are processed entirely in-kernel at wire-speed, eliminating user-space overhead for established sessions.
 
-- **Stateful Acceleration**: Once a connection is verified by Meds as Trusted (`0x400000`), it is offloaded to the kernel's fast path. Subsequent packets bypass deep inspection while remaining under the protection of the rate limiter.
-
-- **Deep Inspection**: Only new or unclassified traffic (the "Decision Phase", limited to the **first 10 packets** via `connbytes`) is sent to the Go engine for deep L3/L4/L7 DPI analysis.
+- **Deep Inspection**: Only new or unclassified traffic (the "Decision Phase") is sent to Meds for deep L3/L4/L7 analysis. This phase is limited to a **10-packet window** to extract metadata (DNS, SNI, JA3) before the kernel takes over.
 
 ---
 
@@ -148,13 +144,13 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   Meds utilizes a stateful marking architecture. It "teaches" the Linux kernel how to handle specific flows by assigning **Conntrack marks**, achieving wire-speed performance for established connections.
 
 - **Intelligent NFQUEUE Balancing**  
-  Intercepts traffic using `NFQUEUE` with `fanout` and `bypass` options, ensuring multi-core scaling and system stability even if the user-space process is restarted.
+  Intercepts traffic using `NFQUEUE` with `balance` and `bypass` options, ensuring multi-core scaling and system stability even if the user-space process is restarted.
 
 - **Lock-free Core Architecture**  
   The core engine is built for high-concurrency performance: no mutexes in the hot path. All filtering, counters, and rate-limiters utilize atomic operations.
 
-- **Multi-layer Rate Limiting**  
-  Combines **Kernel-level protection** (fast `hashlimit` PPS limiting) with **User-space logic** (token bucket) for sophisticated traffic shaping and flood protection.
+- **Rate Limiting**  
+  Uses token bucket algorithm to limit burst and sustained traffic per source IP, protecting the system against high-frequency floods (SYN, DNS, ICMP, or generic packet floods).
 
 - **Blacklist-based filtering**  
   - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)

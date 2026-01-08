@@ -66,7 +66,13 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		if checker.Check(packet) {
 			// accept ip whitelist
 			if checker.Name() == filter.FilterNameWhiteList && checker.Type() == filter.FilterTypeIP {
-				w.nfq.SetVerdictWithOption(*a.PacketID, nfqueue.NfAccept, nfqueue.WithConnMark(addMark(a, ConnMarkWhiteList)))
+				mark := addMark(a, ConnMarkTrustList)
+				w.nfq.SetVerdictWithOption(
+					*a.PacketID,
+					nfqueue.NfAccept,
+					nfqueue.WithMark(mark),
+					nfqueue.WithConnMark(mark),
+				)
 				w.logger.Log(event.NewAccept(zerolog.InfoLevel, "connection accepted", checker.Name(), checker.Type(), packet))
 
 				return
@@ -74,7 +80,13 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		} else {
 			// drop except whitelist
 			if checker.Name() != filter.FilterNameWhiteList {
-				w.nfq.SetVerdictWithOption(*a.PacketID, nfqueue.NfDrop, nfqueue.WithConnMark(addMark(a, ConnMarkBlockList)))
+				mark := addMark(a, ConnMarkBlockList)
+				w.nfq.SetVerdictWithOption(
+					*a.PacketID,
+					nfqueue.NfRepeat,
+					nfqueue.WithMark(mark),
+					nfqueue.WithConnMark(mark),
+				)
 				w.logger.Log(event.NewDrop(zerolog.InfoLevel, "connection dropped", checker.Name(), checker.Type(), packet))
 
 				return
@@ -82,9 +94,15 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		}
 	}
 
-	// trust connection
+	// accept trusted packet
 	if packet.IsTrusted() {
-		w.nfq.SetVerdictWithOption(*a.PacketID, nfqueue.NfAccept, nfqueue.WithConnMark(addMark(a, ConnMarkTrustList)))
+		mark := addMark(a, ConnMarkTrustList)
+		w.nfq.SetVerdictWithOption(
+			*a.PacketID,
+			nfqueue.NfAccept,
+			nfqueue.WithMark(mark),
+			nfqueue.WithConnMark(mark),
+		)
 		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "connection trusted", "trusted packet", filter.FilterTypeEmpty, packet))
 
 		return
