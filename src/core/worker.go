@@ -64,8 +64,8 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	// pass through filters
 	for _, checker := range w.filters {
 		if checker.Check(packet) {
-			// accept ip whitelist
-			if checker.Name() == filter.FilterNameWhiteList && checker.Type() == filter.FilterTypeIP {
+			// accept whitelist
+			if checker.Name() == filter.FilterNameWhiteList {
 				mark := addMark(a, ConnMarkTrustList)
 				w.nfq.SetVerdictWithOption(
 					*a.PacketID,
@@ -78,7 +78,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 				return
 			}
 		} else {
-			// drop except whitelist
+			// drop otherwise
 			if checker.Name() != filter.FilterNameWhiteList {
 				mark := addMark(a, ConnMarkBlockList)
 				w.nfq.SetVerdictWithOption(

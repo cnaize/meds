@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.1.1-blue)
+![Version](https://img.shields.io/badge/version-v1.1.2-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
@@ -104,9 +104,9 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 ┌───────────────────▼───────────────────┐
 │ KERNEL SPACE (iptables / Netfilter)   │
 │ ───────────────────────────────────── │
-│  1. Restore Connmark                ◄─┼──┐
-│                                       │  │
-│  2. Check Block List  ──► DROP        │  │
+│  1. Restore Connmark                  │
+│                                       │
+│  2. Check Block List  ──► DROP      ◄─┼──┐
 │      (Mark: 0x100000)                 │  │
 │                                       │  │
 │  3. Check Trust List  ──► ACCEPT      │  │
@@ -170,7 +170,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   Enables real-time blocking of malicious TLS clients such as malware beacons, scanners, or C2 frameworks.
 
 - **HTTP API for runtime configuration**  
-  Built-in API server (powered by [Gin](https://github.com/gin-gonic/gin)) allows dynamically adding or removing IP or Country entries in global white/black lists.  
+  Built-in API server allows dynamically adding or removing IP or Country entries in global white/black lists.  
   Auth via BasicAuth using `MEDS_USERNAME` / `MEDS_PASSWORD`.
 
 - **Prometheus metrics export**  
