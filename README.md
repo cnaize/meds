@@ -1,15 +1,15 @@
-![Go Version](https://img.shields.io/badge/go-1.25+-00ADD8?logo=go)
+![Go Version](https://img.shields.io/badge/go-1.26+-00ADD8?logo=go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.1.2-blue)
+![Version](https://img.shields.io/badge/version-v1.1.3-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
 ---
 
 # Meds: net healing  
-> Intelligent firewall in Go
+> Hybrid firewall in Go
 
 It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering to block malicious traffic in real-time. Once a connection is checked, the engine "teaches" the Linux kernel to handle it. By assigning **Conntrack marks**, Meds offloads flows back to the kernel space, achieving maximum wire-speed throughput and minimal CPU overhead.
 
@@ -32,7 +32,7 @@ Download the latest binary from [Releases](https://github.com/cnaize/meds/releas
 ### Build from sources
 
 ```bash
-go build -o meds ./cmd/daemon
+go build -o meds github.com/cnaize/meds/cmd/daemon
 ```
 
 ## 🧩 Quickstart
@@ -140,7 +140,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 ## ✨ Key Features
 
-- **Hybrid Kernel/User-space Processing**  
+- **Hybrid Kernel/User space Processing**  
   Meds utilizes a stateful marking architecture. It "teaches" the Linux kernel how to handle specific flows by assigning **Conntrack marks**, achieving wire-speed performance for established connections.
 
 - **Intelligent NFQUEUE Balancing**  
