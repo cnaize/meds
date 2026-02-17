@@ -12,6 +12,7 @@ import (
 	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/types"
 )
 
 var _ filter.Filter = (*StevenBlack)(nil)
@@ -20,9 +21,9 @@ type StevenBlack struct {
 	*Base
 }
 
-func NewStevenBlack(urls []string, logger *logger.Logger) *StevenBlack {
+func NewStevenBlack(urls []string, logger *logger.Logger, include, exclude *types.DomainList) *StevenBlack {
 	return &StevenBlack{
-		Base: NewBase(urls, logger),
+		Base: NewBase(urls, logger, include, exclude),
 	}
 }
 
@@ -37,7 +38,7 @@ func (f *StevenBlack) Load(ctx context.Context) error {
 }
 
 func (f *StevenBlack) Update(ctx context.Context) error {
-	blacklist := radix.New()
+	blocklist := radix.New()
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -71,7 +72,7 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 				domain = fields[1]
 			}
 
-			blacklist.Insert(get.ReversedDomain(domain), struct{}{})
+			blocklist.Insert(get.ReversedDomain(domain), struct{}{})
 		}
 	}
 
@@ -79,9 +80,9 @@ func (f *StevenBlack) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", blacklist.Len()).
+		Int("size", blocklist.Len()).
 		Msg("Filter updated")
-	f.blacklist.Store(blacklist)
+	f.blocklist.Store(blocklist)
 
 	return nil
 }

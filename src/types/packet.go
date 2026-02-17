@@ -231,7 +231,7 @@ func (p *Packet) GetASN(asnlist *ASNList) (ASN, bool) {
 		return p.asn, false
 	}
 
-	asn, ok := asnlist.Load().Lookup(srcIP)
+	asn, ok := asnlist.Lookup(srcIP)
 	if !ok {
 		return p.asn, false
 	}

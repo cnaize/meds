@@ -1,0 +1,429 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io/fs"
+	"net/netip"
+	"os"
+	"runtime"
+	"time"
+
+	"github.com/appleboy/graceful"
+	"github.com/rs/zerolog"
+
+	"github.com/cnaize/meds/lib/util/get"
+	"github.com/cnaize/meds/src/config"
+	"github.com/cnaize/meds/src/core"
+	"github.com/cnaize/meds/src/core/filter"
+	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/database"
+	"github.com/cnaize/meds/src/server"
+	"github.com/cnaize/meds/src/types"
+
+	asnfilter "github.com/cnaize/meds/src/core/filter/asn"
+	domainfilter "github.com/cnaize/meds/src/core/filter/domain"
+	geofilter "github.com/cnaize/meds/src/core/filter/geo"
+	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
+	ja3filter "github.com/cnaize/meds/src/core/filter/ja3"
+	ratefilter "github.com/cnaize/meds/src/core/filter/rate"
+)
+
+func main() {
+	var cfg config.Config
+	// parse config
+	flag.StringVar(&cfg.LogLevel, "log-level", "info", "zerolog level")
+	flag.StringVar(&cfg.DBFilePath, "db-path", "meds.db", "path to database file")
+	flag.StringVar(&cfg.APIServerAddr, "api-addr", ":8000", "api server address")
+	flag.UintVar(&cfg.ReadersCount, "readers-count", uint(runtime.GOMAXPROCS(0)), "nfqueue readers count")
+	flag.UintVar(&cfg.WorkersCount, "workers-count", 1, "nfqueue workers count (per reader)")
+	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(max(1, runtime.GOMAXPROCS(0)/4)), "logger workers count")
+	flag.UintVar(&cfg.ReaderQLen, "reader-queue-len", 8192, "nfqueue queue length (per reader)")
+	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
+	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
+	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
+	flag.UintVar(&cfg.LimiterRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
+	flag.UintVar(&cfg.LimiterBurst, "rate-limiter-burst", 1500, "max packets at once (per ip)")
+	flag.UintVar(&cfg.LimiterCacheSize, "rate-limiter-cache-size", 100_000, "rate limiter cache size (all buckets)")
+	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-cache-ttl", 5*time.Minute, "rate limiter cache ttl (per bucket)")
+	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
+	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
+	// flag.StringVar(&cfg.Password, "password", "admin", "admin password")
+	flag.Parse()
+
+	// set "debug" for invalid log level
+	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
+	if err != nil {
+		logLevel = zerolog.DebugLevel
+	}
+
+	// main context
+	mainCtx, mainCancel := context.WithCancel(context.Background())
+	defer mainCancel()
+
+	// create logger
+	logger := logger.NewLogger(
+		new(
+			zerolog.New(zerolog.NewConsoleWriter()).
+				With().
+				Timestamp().
+				Logger().
+				Level(logLevel),
+		),
+		cfg.LoggerQLen,
+	)
+	logger.Run(mainCtx, cfg.LoggersCount)
+
+	// check username/password
+	cfg.Username = os.Getenv("MEDS_USERNAME")
+	cfg.Password = os.Getenv("MEDS_PASSWORD")
+	if len(cfg.Username) < 1 || len(cfg.Password) < 1 {
+		logger.Raw().Fatal().Msg(`Please set "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables`)
+	}
+
+	logger.Raw().Info().Msg("Running Meds...")
+
+	// init database
+	db, err := initDatabase(mainCtx, &cfg, logger)
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("database init failed")
+	}
+
+	// load allow/block lists
+	ipAllowList, countryBlockList, err := loadAllowBlockLists(mainCtx, db)
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("allow/block lists load failed")
+	}
+
+	// load ip lists
+	ipIncludeList, ipExcludeList, err := loadIPLists(mainCtx, db)
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("ip lists load failed")
+	}
+
+	// load asn lists
+	asnIncludeList, asnExcludeList, err := loadASNLists(mainCtx, db)
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("asn lists load failed")
+	}
+
+	// load ja3 lists
+	ja3IncludeList, ja3ExcludeList, err := loadJA3Lists(mainCtx, db)
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("ja3 lists load failed")
+	}
+
+	// load domain lists
+	domainIncludeList, domainExcludeList, err := loadDomainLists(mainCtx, db)
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("domain lists load failed")
+	}
+
+	// create filters
+	filters := newFilters(
+		&cfg,
+		logger,
+		ipAllowList,
+		countryBlockList,
+		ipIncludeList,
+		ipExcludeList,
+		asnIncludeList,
+		asnExcludeList,
+		ja3IncludeList,
+		ja3ExcludeList,
+		domainIncludeList,
+		domainExcludeList,
+	)
+
+	// create queue
+	q := core.NewQueue(&cfg, filters, logger)
+	if err := q.Load(mainCtx); err != nil {
+		logger.Raw().Fatal().Err(err).Msg("queue load failed")
+	}
+	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
+
+	// create server
+	api := server.NewServer(
+		&cfg,
+		db,
+		ipAllowList,
+		countryBlockList,
+		ipIncludeList,
+		ipExcludeList,
+		asnIncludeList,
+		asnExcludeList,
+		ja3IncludeList,
+		ja3ExcludeList,
+		domainIncludeList,
+		domainExcludeList,
+	)
+
+	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(graceful.NewLogger()))
+	m.AddRunningJob(func(ctx context.Context) error {
+		defer mainCancel()
+
+		// run server
+		go func() {
+			defer mainCancel()
+
+			if err := api.Run(ctx); err != nil {
+				logger.Raw().Err(err).Msg("api run failed")
+			}
+		}()
+
+		// run queue
+		if err := q.Run(ctx); err != nil {
+			logger.Raw().Err(err).Msg("queue run failed")
+		}
+
+		return nil
+	})
+	m.AddShutdownJob(func() error {
+		// close server
+		if err := api.Close(); err != nil {
+			logger.Raw().Err(err).Msg("api close failed")
+		}
+
+		// close queue
+		if err := q.Close(); err != nil {
+			logger.Raw().Err(err).Msg("queue close failed")
+		}
+
+		// close database
+		if err := db.Close(); err != nil {
+			logger.Raw().Err(err).Msg("database close failed")
+		}
+
+		return nil
+	})
+
+	// wait till the end
+	<-m.Done()
+}
+
+func initDatabase(ctx context.Context, cfg *config.Config, logger *logger.Logger) (*database.Database, error) {
+	// check database is new
+	_, err := os.Stat(cfg.DBFilePath)
+	isNewDatabase := errors.Is(err, fs.ErrNotExist)
+
+	// init database
+	db := database.NewDatabase(cfg, logger)
+	if err := db.Init(ctx); err != nil {
+		return nil, fmt.Errorf("init: %w", err)
+	}
+
+	// prefill database
+	if isNewDatabase {
+		ipExcludeList := []netip.Prefix{
+			netip.MustParsePrefix("0.0.0.0/8"),
+			netip.MustParsePrefix("10.0.0.0/8"),
+			netip.MustParsePrefix("127.0.0.0/8"),
+			netip.MustParsePrefix("172.16.0.0/12"),
+			netip.MustParsePrefix("192.168.0.0/16"),
+		}
+
+		for _, subnet := range ipExcludeList {
+			if err := db.Q.UpsertIPExcludeList(ctx, db.DB, subnet.String()); err != nil {
+				return nil, fmt.Errorf("prefill ip excludelist: %w", err)
+			}
+		}
+	}
+
+	return db, nil
+}
+
+func newFilters(
+	cfg *config.Config,
+	logger *logger.Logger,
+	ipAllowList *types.IPList,
+	countryBlocklist *types.CountryList,
+	ipIncludeList *types.IPList,
+	ipExcludeList *types.IPList,
+	asnIncludeList *types.MapList[uint32],
+	asnExcludeList *types.MapList[uint32],
+	ja3IncludeList *types.MapList[string],
+	ja3ExcludeList *types.MapList[string],
+	domainIncludeList *types.DomainList,
+	domainExcludeList *types.DomainList,
+) []filter.Filter {
+	// geofilter.IPLocate is responsible for the ASNList updates
+	asnList := types.NewASNList()
+
+	return []filter.Filter{
+		// ip allowlist
+		ipfilter.NewAllowList(logger, ipAllowList),
+		// rate filter
+		ratefilter.NewLimiter(cfg.LimiterRate, cfg.LimiterBurst, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
+		// ip filters
+		ipfilter.NewFireHOL([]string{
+			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
+		}, logger, ipIncludeList, ipExcludeList),
+		ipfilter.NewSpamhaus([]string{
+			"https://www.spamhaus.org/drop/drop.txt",
+		}, logger, ipIncludeList, ipExcludeList),
+		ipfilter.NewAbuse([]string{
+			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+		}, logger, ipIncludeList, ipExcludeList),
+		// geo filters
+		geofilter.NewIPLocate([]string{
+			"https://github.com/iplocate/ip-address-databases/raw/refs/heads/main/ip-to-asn/ip-to-asn.csv.zip",
+		}, logger, asnList, countryBlocklist),
+		// asn filters
+		asnfilter.NewSpamhaus([]string{
+			"https://www.spamhaus.org/drop/asndrop.json",
+		}, logger, asnList, asnIncludeList, asnExcludeList),
+		// dns/sni filters
+		domainfilter.NewStevenBlack([]string{
+			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+		}, logger, domainIncludeList, domainExcludeList),
+		domainfilter.NewSomeoneWhoCares([]string{
+			"https://someonewhocares.org/hosts/hosts",
+		}, logger, domainIncludeList, domainExcludeList),
+		// ja3 filters
+		ja3filter.NewAbuse([]string{
+			"https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv",
+		}, logger, ja3IncludeList, ja3ExcludeList),
+	}
+}
+
+func loadIPLists(ctx context.Context, db *database.Database) (*types.IPList, *types.IPList, error) {
+	// includelist
+	include, err := db.Q.GetAllIPIncludeList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all includelist: %w", err)
+	}
+	subnetList, err := get.Subnets(include)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get subnet includelist: %w", err)
+	}
+	includeList := types.NewIPList()
+	if err := includeList.Upsert(subnetList); err != nil {
+		return nil, nil, fmt.Errorf("upsert subnet includelist: %w", err)
+	}
+
+	// excludelist
+	exclude, err := db.Q.GetAllIPExcludeList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all excludelist: %w", err)
+	}
+	subnetList, err = get.Subnets(exclude)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get subnet excludelist: %w", err)
+	}
+	excludeList := types.NewIPList()
+	if err := excludeList.Upsert(subnetList); err != nil {
+		return nil, nil, fmt.Errorf("upsert subnet excludelist: %w", err)
+	}
+
+	return includeList, excludeList, nil
+}
+
+func loadASNLists(ctx context.Context, db *database.Database) (*types.MapList[uint32], *types.MapList[uint32], error) {
+	// includelist
+	include, err := db.Q.GetAllASNIncludeList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all includelist: %w", err)
+	}
+	asnList := make([]uint32, 0, len(include))
+	for _, asn := range include {
+		asnList = append(asnList, uint32(asn))
+	}
+	includeList := types.NewMapList[uint32]()
+	if err := includeList.Upsert(asnList); err != nil {
+		return nil, nil, fmt.Errorf("upsert includelist: %w", err)
+	}
+
+	// excludelist
+	exclude, err := db.Q.GetAllASNExcludeList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all excludelist: %w", err)
+	}
+	asnList = make([]uint32, 0, len(exclude))
+	for _, asn := range exclude {
+		asnList = append(asnList, uint32(asn))
+	}
+	excludeList := types.NewMapList[uint32]()
+	if err := excludeList.Upsert(asnList); err != nil {
+		return nil, nil, fmt.Errorf("upsert excludelist: %w", err)
+	}
+
+	return includeList, excludeList, nil
+}
+
+func loadJA3Lists(ctx context.Context, db *database.Database) (*types.MapList[string], *types.MapList[string], error) {
+	// includelist
+	include, err := db.Q.GetAllJA3IncludeList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all includelist: %w", err)
+	}
+	includeList := types.NewMapList[string]()
+	if err := includeList.Upsert(include); err != nil {
+		return nil, nil, fmt.Errorf("upsert includelist: %w", err)
+	}
+
+	// excludelist
+	exclude, err := db.Q.GetAllJA3ExcludeList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all excludelist: %w", err)
+	}
+	excludeList := types.NewMapList[string]()
+	if err := excludeList.Upsert(exclude); err != nil {
+		return nil, nil, fmt.Errorf("upsert excludelist: %w", err)
+	}
+
+	return includeList, excludeList, nil
+}
+
+func loadDomainLists(ctx context.Context, db *database.Database) (*types.DomainList, *types.DomainList, error) {
+	// includelist
+	include, err := db.Q.GetAllDomainIncludeList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all includelist: %w", err)
+	}
+	includeList := types.NewDomainList()
+	if err := includeList.Upsert(include); err != nil {
+		return nil, nil, fmt.Errorf("upsert includelist: %w", err)
+	}
+
+	// excludelist
+	exclude, err := db.Q.GetAllDomainExcludeList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all excludelist: %w", err)
+	}
+	excludeList := types.NewDomainList()
+	if err := excludeList.Upsert(exclude); err != nil {
+		return nil, nil, fmt.Errorf("upsert excludelist: %w", err)
+	}
+
+	return includeList, excludeList, nil
+}
+
+func loadAllowBlockLists(ctx context.Context, db *database.Database) (*types.IPList, *types.CountryList, error) {
+	// load ip allowlist
+	snAllowList, err := db.Q.GetAllIPAllowList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all ip allowlist: %w", err)
+	}
+	subnets, err := get.Subnets(snAllowList)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get subnet allowlist: %w", err)
+	}
+	ipAllowList := types.NewIPList()
+	if err := ipAllowList.Upsert(subnets); err != nil {
+		return nil, nil, fmt.Errorf("upsert subnet allowlist: %w", err)
+	}
+
+	// load country blocklist
+	crBlockList, err := db.Q.GetAllCountryBlockList(ctx, db.DB)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get all country blocklist: %w", err)
+	}
+	countryBlockList := types.NewCountryList()
+	if err := countryBlockList.Upsert(crBlockList); err != nil {
+		return nil, nil, fmt.Errorf("upsert country blocklist: %w", err)
+	}
+
+	return ipAllowList, countryBlockList, nil
+}

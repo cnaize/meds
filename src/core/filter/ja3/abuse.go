@@ -9,6 +9,7 @@ import (
 
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/types"
 )
 
 var _ filter.Filter = (*Abuse)(nil)
@@ -17,9 +18,9 @@ type Abuse struct {
 	*Base
 }
 
-func NewAbuse(urls []string, logger *logger.Logger) *Abuse {
+func NewAbuse(urls []string, logger *logger.Logger, include, exclude *types.MapList[string]) *Abuse {
 	return &Abuse{
-		Base: NewBase(urls, logger),
+		Base: NewBase(urls, logger, include, exclude),
 	}
 }
 
@@ -34,7 +35,7 @@ func (f *Abuse) Load(ctx context.Context) error {
 }
 
 func (f *Abuse) Update(ctx context.Context) error {
-	blacklist := map[string]bool{}
+	blocklist := make(map[string]struct{})
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -62,7 +63,7 @@ func (f *Abuse) Update(ctx context.Context) error {
 				continue
 			}
 
-			blacklist[fields[0]] = true
+			blocklist[fields[0]] = struct{}{}
 		}
 	}
 
@@ -70,9 +71,9 @@ func (f *Abuse) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", len(blacklist)).
+		Int("size", len(blocklist)).
 		Msg("Filter updated")
-	f.blacklist.Store(&blacklist)
+	f.blocklist.Store(&blocklist)
 
 	return nil
 }

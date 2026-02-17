@@ -20,9 +20,9 @@ type Spamhaus struct {
 	*Base
 }
 
-func NewSpamhaus(urls []string, logger *logger.Logger, anslist *types.ASNList) *Spamhaus {
+func NewSpamhaus(urls []string, logger *logger.Logger, anslist *types.ASNList, include, exclude *types.MapList[uint32]) *Spamhaus {
 	return &Spamhaus{
-		Base: NewBase(urls, logger, anslist),
+		Base: NewBase(urls, logger, anslist, include, exclude),
 	}
 }
 
@@ -37,7 +37,7 @@ func (f *Spamhaus) Load(ctx context.Context) error {
 }
 
 func (f *Spamhaus) Update(ctx context.Context) error {
-	blacklist := make(map[uint32]bool)
+	blocklist := make(map[uint32]struct{})
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -68,7 +68,7 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 				continue
 			}
 
-			blacklist[entry.ASN] = true
+			blocklist[entry.ASN] = struct{}{}
 		}
 	}
 
@@ -76,9 +76,9 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", len(blacklist)).
+		Int("size", len(blocklist)).
 		Msg("Filter updated")
-	f.blacklist.Store(&blacklist)
+	f.blocklist.Store(&blocklist)
 
 	return nil
 }

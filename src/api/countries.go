@@ -11,16 +11,16 @@ import (
 	"github.com/cnaize/meds/src/types"
 )
 
-// GetBlackListCountries godoc
+// CountryBlockListGet godoc
 //
-//	@Summary		Get blacklisted countries
-//	@Description	get all blacklisted countries
-//	@Tags			blacklist
+//	@Summary		Get blocked countries
+//	@Description	get all blocked countries
+//	@Tags			Countries
 //	@Produce		json
 //	@Success		200	{object}	GetCountriesResp
-//	@Router			/v1/blacklist/countries [get]
-func GetBlackListCountries(blacklist *types.CountryList, mu *sync.Mutex) func(*gin.Context) {
-	return countryListGetAll(blacklist, mu)
+//	@Router			/v1/countries/blocklist [get]
+func CountryBlockListGet(blocklist *types.CountryList, mu *sync.Mutex) func(*gin.Context) {
+	return countryListGetAll(blocklist, mu)
 }
 
 type GetCountriesResp struct {
@@ -36,17 +36,17 @@ func countryListGetAll(list *types.CountryList, mu *sync.Mutex) func(*gin.Contex
 	}
 }
 
-// CheckBlackListCountry godoc
+// CountryBlockListCheck godoc
 //
-//	@Summary		Check blacklisted country
-//	@Description	check if a country is blacklisted
-//	@Tags			blacklist
+//	@Summary		Check blocked country
+//	@Description	check if a country is blocked
+//	@Tags			Countries
 //	@Produce		json
 //	@Param			country	path		string	true	"country to check"
 //	@Success		200		{object}	CheckCountryResp
-//	@Router			/v1/blacklist/countries/{country} [get]
-func CheckBlackListCountry(blacklist *types.CountryList, mu *sync.Mutex) func(*gin.Context) {
-	return countryListLookup(blacklist, mu)
+//	@Router			/v1/countries/blocklist/{country} [get]
+func CountryBlockListCheck(blocklist *types.CountryList, mu *sync.Mutex) func(*gin.Context) {
+	return countryListLookup(blocklist, mu)
 }
 
 type CheckCountryResp struct {
@@ -66,20 +66,20 @@ func countryListLookup(list *types.CountryList, mu *sync.Mutex) func(*gin.Contex
 	}
 }
 
-// UpsertCountriesReq godoc
+// CountryBlockListUpsert godoc
 //
-//	@Summary		Upsert blacklisted countries
-//	@Description	upsert countries to blacklist
-//	@Tags			blacklist
+//	@Summary		Upsert blocked countries
+//	@Description	upsert countries to blocklist
+//	@Tags			Countries
 //	@Accept			json
 //	@Param			body	body	UpsertCountriesReq	true	"countries to add"
 //	@Success		202
 //	@Failure		400
 //	@Failure		422
 //	@Failure		500
-//	@Router			/v1/blacklist/countries [post]
-func UpsertBlackListCountries(blacklist *types.CountryList, mu *sync.Mutex, db *database.Database) func(*gin.Context) {
-	return countryListUpsert(blacklist, mu, db, db.Q.UpsertBlackListCountry)
+//	@Router			/v1/countries/blocklist [post]
+func CountryBlockListUpsert(blocklist *types.CountryList, mu *sync.Mutex, db *database.Database) func(*gin.Context) {
+	return countryListUpsert(blocklist, mu, db, db.Q.UpsertCountryBlockList)
 }
 
 type UpsertCountriesReq struct {
@@ -118,20 +118,20 @@ func countryListUpsert(
 	}
 }
 
-// RemoveBlackListCountries godoc
+// CountryBlockListRemove godoc
 //
-//	@Summary		Remove blacklisted countries
-//	@Description	remove countries from blacklist
-//	@Tags			blacklist
+//	@Summary		Remove blocked countries
+//	@Description	remove countries from blocklist
+//	@Tags			Countries
 //	@Accept			json
 //	@Param			body	body	RemoveCountriesReq	true	"countries to remove"
 //	@Success		202
 //	@Failure		400
 //	@Failure		422
 //	@Failure		500
-//	@Router			/v1/blacklist/countries [delete]
-func RemoveBlackListCountries(blacklist *types.CountryList, mu *sync.Mutex, db *database.Database) func(*gin.Context) {
-	return countryListRemove(blacklist, mu, db, db.Q.RemoveBlackListCountry)
+//	@Router			/v1/countries/blocklist [delete]
+func CountryBlockListRemove(blocklist *types.CountryList, mu *sync.Mutex, db *database.Database) func(*gin.Context) {
+	return countryListRemove(blocklist, mu, db, db.Q.RemoveCountryBlockList)
 }
 
 type RemoveCountriesReq struct {

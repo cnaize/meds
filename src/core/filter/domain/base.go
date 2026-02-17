@@ -2,9 +2,6 @@ package domain
 
 import (
 	"context"
-	"sync/atomic"
-
-	"github.com/armon/go-radix"
 
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
@@ -12,15 +9,20 @@ import (
 )
 
 type Base struct {
-	urls      []string
-	logger    *logger.Logger
-	blacklist atomic.Pointer[radix.Tree]
+	urls   []string
+	logger *logger.Logger
+
+	include   *types.DomainList
+	exclude   *types.DomainList
+	blocklist *types.DomainList
 }
 
-func NewBase(urls []string, logger *logger.Logger) *Base {
+func NewBase(urls []string, logger *logger.Logger, include, exclude *types.DomainList) *Base {
 	return &Base{
-		urls:   urls,
-		logger: logger,
+		urls:    urls,
+		logger:  logger,
+		include: include,
+		exclude: exclude,
 	}
 }
 
@@ -29,15 +31,20 @@ func (f *Base) Type() filter.FilterType {
 }
 
 func (f *Base) Load(ctx context.Context) error {
-	f.blacklist.Store(radix.New())
+	f.blocklist = types.NewDomainList()
 
 	return nil
 }
 
 func (f *Base) Check(packet *types.Packet) bool {
-	list := f.blacklist.Load()
-	for _, revDomain := range packet.GetReversedDomains() {
-		if _, _, found := list.LongestPrefix(revDomain); found {
+	for _, domain := range packet.GetDomains() {
+		// check excludelist
+		if f.exclude.Lookup(domain) {
+			continue
+		}
+
+		// check include/block lists
+		if f.include.Lookup(domain) || f.blocklist.Lookup(domain) {
 			return false
 		}
 	}

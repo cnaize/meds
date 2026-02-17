@@ -2,9 +2,6 @@ package ip
 
 import (
 	"context"
-	"sync/atomic"
-
-	"github.com/gaissmai/bart"
 
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
@@ -12,15 +9,20 @@ import (
 )
 
 type Base struct {
-	urls      []string
-	logger    *logger.Logger
-	blacklist atomic.Pointer[bart.Lite]
+	urls   []string
+	logger *logger.Logger
+
+	include   *types.IPList
+	exclude   *types.IPList
+	blocklist *types.IPList
 }
 
-func NewBase(urls []string, logger *logger.Logger) *Base {
+func NewBase(urls []string, logger *logger.Logger, include, exclude *types.IPList) *Base {
 	return &Base{
-		urls:   urls,
-		logger: logger,
+		urls:    urls,
+		logger:  logger,
+		include: include,
+		exclude: exclude,
 	}
 }
 
@@ -29,7 +31,7 @@ func (f *Base) Type() filter.FilterType {
 }
 
 func (f *Base) Load(ctx context.Context) error {
-	f.blacklist.Store(new(bart.Lite))
+	f.blocklist = types.NewIPList()
 
 	return nil
 }
@@ -40,6 +42,11 @@ func (f *Base) Check(packet *types.Packet) bool {
 		return true
 	}
 
-	list := f.blacklist.Load()
-	return !list.Contains(srcIP)
+	// check excludelist
+	if f.exclude.Lookup(srcIP) {
+		return true
+	}
+
+	// check include/block lists
+	return !(f.include.Lookup(srcIP) || f.blocklist.Lookup(srcIP))
 }

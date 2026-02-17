@@ -1,17 +1,39 @@
-CREATE TABLE IF NOT EXISTS subnet_whitelist (
-    subnet TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS ip_allowlist (
+    subnet TEXT NOT NULL UNIQUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_snwl_subnet ON subnet_whitelist (subnet);
-
-CREATE TABLE IF NOT EXISTS subnet_blacklist (
-    subnet TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS country_blocklist (
+    country TEXT NOT NULL UNIQUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_snbl_subnet ON subnet_blacklist (subnet);
-
-CREATE TABLE IF NOT EXISTS country_blacklist (
-    country TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS ip_includelist (
+    subnet TEXT NOT NULL UNIQUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_crbl_country ON country_blacklist (country);
+CREATE TABLE IF NOT EXISTS ip_excludelist (
+    subnet TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS asn_includelist (
+    asn INTEGER NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS asn_excludelist (
+    asn INTEGER NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS ja3_includelist (
+    hash TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS ja3_excludelist (
+    hash TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS domain_includelist (
+    domain TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS domain_excludelist (
+    domain TEXT NOT NULL UNIQUE
+);

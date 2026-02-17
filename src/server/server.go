@@ -22,14 +22,34 @@ type Server struct {
 func NewServer(
 	cfg *config.Config,
 	db *database.Database,
-	subnetWhiteList *types.SubnetList,
-	subnetBlackList *types.SubnetList,
-	countryBlackList *types.CountryList,
+	ipAllowList *types.IPList,
+	countryBlockList *types.CountryList,
+	ipIncludeList *types.IPList,
+	ipExcludeList *types.IPList,
+	asnIncludeList *types.MapList[uint32],
+	asnExcludeList *types.MapList[uint32],
+	ja3IncludeList *types.MapList[string],
+	ja3ExcludeList *types.MapList[string],
+	domainIncludeList *types.DomainList,
+	domainExcludeList *types.DomainList,
 ) *Server {
 	r := gin.New()
 	r.Use(gin.BasicAuth(gin.Accounts{cfg.Username: cfg.Password}), gin.Recovery())
 
-	api.Register(r, db, subnetWhiteList, subnetBlackList, countryBlackList)
+	api.Register(
+		r,
+		db,
+		ipAllowList,
+		countryBlockList,
+		ipIncludeList,
+		ipExcludeList,
+		asnIncludeList,
+		asnExcludeList,
+		ja3IncludeList,
+		ja3ExcludeList,
+		domainIncludeList,
+		domainExcludeList,
+	)
 
 	return &Server{
 		router: r,

@@ -2,18 +2,18 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.1.3-blue)
+![Version](https://img.shields.io/badge/version-v1.2.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
 ---
 
 # Meds: net healing  
-> Hybrid firewall in Go
+> Hybrid firewall in Go using public blocklists
 
-It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering to block malicious traffic in real-time. Once a connection is checked, the engine "teaches" the Linux kernel to handle it. By assigning **Conntrack marks**, Meds offloads flows back to the kernel space, achieving maximum wire-speed throughput and minimal CPU overhead.
+It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering based on public blocklists. Once a connection is checked, the engine "teaches" the Linux kernel to handle it. By assigning **Conntrack marks**, Meds offloads flows back to the kernel space, achieving maximum wire-speed throughput and minimal CPU overhead.
 
-*Designed to cure your network from malicious traffic*
+*Designed to cure your network of malicious traffic*
 
 ---
 
@@ -27,12 +27,12 @@ The application manages iptables and conntrack rules automatically.
 
 ### Download
 
-Download the latest binary from [Releases](https://github.com/cnaize/meds/releases) or build from sources.
+Download the latest binary from [Releases](https://github.com/cnaize/meds/releases) or install via Go.
 
-### Build from sources
+### Install via Go
 
 ```bash
-go build -o meds github.com/cnaize/meds/cmd/daemon
+go install github.com/cnaize/meds/cmd/meds@latest
 ```
 
 ## 🧩 Quickstart
@@ -81,7 +81,7 @@ Usage of ./meds:
 ### Prometheus metrics  
 👉 http://localhost:8000/metrics  
 
-The metrics endpoint is protected by the same **BasicAuth** credentials as the API.
+The metrics endpoint is protected by the same **Basic Auth** credentials as the API.
 
 ### Swagger UI
 
@@ -106,10 +106,10 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 │ ───────────────────────────────────── │
 │  1. Restore Connmark                  │
 │                                       │
-│  2. Check Block List  ──► DROP      ◄─┼──┐
+│  2. Check Blocklist   ──► DROP      ◄─┼──┐
 │      (Mark: 0x100000)                 │  │
 │                                       │  │
-│  3. Check Trust List  ──► ACCEPT      │  │
+│  3. Check Trustlist   ──► ACCEPT      │  │
 │      (Mark: 0x200000)                 │  │
 │                                       │  │
 │  4. First 10 packets  ──┐             │  │
@@ -152,10 +152,10 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 - **Rate Limiting**  
   Uses token bucket algorithm to limit burst and sustained traffic per source IP, protecting the system against high-frequency floods (SYN, DNS, ICMP, or generic packet floods).
 
-- **Blacklist-based filtering**  
-  - IP blacklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)
-  - ASN blacklists: [Spamhaus ASN DROP](https://www.spamhaus.org/drop/asndrop.json) using [IPLocate.io](https://iplocate.io/) for IP-to-ASN mapping
-  - Domain blacklists: [StevenBlack hosts](https://github.com/StevenBlack/hosts/), [SomeoneWhoCares hosts](https://someonewhocares.org/hosts/)
+- **Blocklist-based filtering**  
+  - IP blocklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)
+  - ASN blocklists: [Spamhaus ASN DROP](https://www.spamhaus.org/drop/asndrop.json) using [IPLocate.io](https://iplocate.io/) for IP-to-ASN mapping
+  - Domain blocklists: [StevenBlack hosts](https://github.com/StevenBlack/hosts/), [SomeoneWhoCares hosts](https://someonewhocares.org/hosts/)
 
 - **Geo-blocking (ASN-based)**  
   Efficiently blocks traffic from specific countries using ASN metadata from [IPLocate.io](https://iplocate.io/):  
@@ -170,8 +170,8 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
   Enables real-time blocking of malicious TLS clients such as malware beacons, scanners, or C2 frameworks.
 
 - **HTTP API for runtime configuration**  
-  Built-in API server allows dynamically adding or removing IP or Country entries in global white/black lists.  
-  Auth via BasicAuth using `MEDS_USERNAME` / `MEDS_PASSWORD`.
+  Built-in API server allows dynamically adding or removing IP or Country entries in global allow/block lists.  
+  Auth via Basic Auth using `MEDS_USERNAME` / `MEDS_PASSWORD`.
 
 - **Prometheus metrics export**  
   Exposes metrics for observability:
@@ -191,7 +191,7 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 # TYPE meds_core_packets_accepted_total counter
 meds_core_packets_accepted_total{filter="empty",reason="default"} 12021
 meds_core_packets_accepted_total{filter="empty",reason="trusted packet"} 420
-meds_core_packets_accepted_total{filter="ip",reason="WhiteList"} 139
+meds_core_packets_accepted_total{filter="ip",reason="AllowList"} 139
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter

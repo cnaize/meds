@@ -1,5 +1,20 @@
 definitions:
+  api.CheckASNResp:
+    properties:
+      found:
+        type: boolean
+    type: object
   api.CheckCountryResp:
+    properties:
+      found:
+        type: boolean
+    type: object
+  api.CheckDomainResp:
+    properties:
+      found:
+        type: boolean
+    type: object
+  api.CheckJA3Resp:
     properties:
       found:
         type: boolean
@@ -9,12 +24,42 @@ definitions:
       found:
         type: boolean
     type: object
+  api.GetASNsResp:
+    properties:
+      asns:
+        example:
+        - 206831
+        - 400328
+        items:
+          type: integer
+        type: array
+    type: object
   api.GetCountriesResp:
     properties:
       countries:
         example:
         - fr
         - de
+        items:
+          type: string
+        type: array
+    type: object
+  api.GetDomainsResp:
+    properties:
+      domains:
+        example:
+        - good.com
+        - bad.com
+        items:
+          type: string
+        type: array
+    type: object
+  api.GetJA3Resp:
+    properties:
+      hashes:
+        example:
+        - a50a861119aceb0ccc74902e8fddb618
+        - 534ce2dbc413c68e908363b5df0ae5e0
         items:
           type: string
         type: array
@@ -29,12 +74,42 @@ definitions:
           type: string
         type: array
     type: object
+  api.RemoveASNsReq:
+    properties:
+      asns:
+        example:
+        - 206831
+        - 400328
+        items:
+          type: integer
+        type: array
+    type: object
   api.RemoveCountriesReq:
     properties:
       countries:
         example:
         - fr
         - de
+        items:
+          type: string
+        type: array
+    type: object
+  api.RemoveDomainsReq:
+    properties:
+      domains:
+        example:
+        - good.com
+        - bad.com
+        items:
+          type: string
+        type: array
+    type: object
+  api.RemoveJA3Req:
+    properties:
+      hashes:
+        example:
+        - a50a861119aceb0ccc74902e8fddb618
+        - 534ce2dbc413c68e908363b5df0ae5e0
         items:
           type: string
         type: array
@@ -49,12 +124,42 @@ definitions:
           type: string
         type: array
     type: object
+  api.UpsertASNsReq:
+    properties:
+      asns:
+        example:
+        - 206831
+        - 400328
+        items:
+          type: integer
+        type: array
+    type: object
   api.UpsertCountriesReq:
     properties:
       countries:
         example:
         - fr
         - de
+        items:
+          type: string
+        type: array
+    type: object
+  api.UpsertDomainsReq:
+    properties:
+      domains:
+        example:
+        - good.com
+        - bad.com
+        items:
+          type: string
+        type: array
+    type: object
+  api.UpsertJA3Req:
+    properties:
+      hashes:
+        example:
+        - a50a861119aceb0ccc74902e8fddb618
+        - 534ce2dbc413c68e908363b5df0ae5e0
         items:
           type: string
         type: array
@@ -72,19 +177,179 @@ definitions:
 info:
   contact:
     name: cnaize
-    url: https://github.com/cnaize/meds
-  description: NFQUEUE firewall written in Go
+    url: https://github.com/cnaize
+  description: Hybrid firewall in Go using public blocklists
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
   title: 'Meds: net healing'
-  version: v1.1.0
+  version: v1.2.0
 paths:
-  /v1/blacklist/countries:
+  /v1/asns/blocklist/exclude:
     delete:
       consumes:
       - application/json
-      description: remove countries from blacklist
+      description: remove ASNs from excludelist
+      parameters:
+      - description: ASNs to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveASNsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove excluded ASNs
+      tags:
+      - ASNs
+    get:
+      description: get all excluded ASNs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetASNsResp'
+      summary: Get excluded ASNs
+      tags:
+      - ASNs
+    post:
+      consumes:
+      - application/json
+      description: upsert ASNs to excludelist
+      parameters:
+      - description: ASNs to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertASNsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert excluded ASNs
+      tags:
+      - ASNs
+  /v1/asns/blocklist/exclude/{asn}:
+    get:
+      description: check if an ASN is excluded
+      parameters:
+      - description: ASN to check
+        in: path
+        name: asn
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckASNResp'
+        "400":
+          description: Bad Request
+      summary: Check excluded ASN
+      tags:
+      - ASNs
+  /v1/asns/blocklist/include:
+    delete:
+      consumes:
+      - application/json
+      description: remove ASNs from includelist
+      parameters:
+      - description: ASNs to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveASNsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove included ASNs
+      tags:
+      - ASNs
+    get:
+      description: get all included ASNs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetASNsResp'
+      summary: Get included ASNs
+      tags:
+      - ASNs
+    post:
+      consumes:
+      - application/json
+      description: upsert ASNs to includelist
+      parameters:
+      - description: ASNs to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertASNsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert included ASNs
+      tags:
+      - ASNs
+  /v1/asns/blocklist/include/{asn}:
+    get:
+      description: check if an ASN is included
+      parameters:
+      - description: ASN to check
+        in: path
+        name: asn
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckASNResp'
+        "400":
+          description: Bad Request
+      summary: Check included ASN
+      tags:
+      - ASNs
+  /v1/countries/blocklist:
+    delete:
+      consumes:
+      - application/json
+      description: remove countries from blocklist
       parameters:
       - description: countries to remove
         in: body
@@ -101,11 +366,11 @@ paths:
           description: Unprocessable Entity
         "500":
           description: Internal Server Error
-      summary: Remove blacklisted countries
+      summary: Remove blocked countries
       tags:
-      - blacklist
+      - Countries
     get:
-      description: get all blacklisted countries
+      description: get all blocked countries
       produces:
       - application/json
       responses:
@@ -113,13 +378,13 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.GetCountriesResp'
-      summary: Get blacklisted countries
+      summary: Get blocked countries
       tags:
-      - blacklist
+      - Countries
     post:
       consumes:
       - application/json
-      description: upsert countries to blacklist
+      description: upsert countries to blocklist
       parameters:
       - description: countries to add
         in: body
@@ -136,12 +401,12 @@ paths:
           description: Unprocessable Entity
         "500":
           description: Internal Server Error
-      summary: Upsert blacklisted countries
+      summary: Upsert blocked countries
       tags:
-      - blacklist
-  /v1/blacklist/countries/{country}:
+      - Countries
+  /v1/countries/blocklist/{country}:
     get:
-      description: check if a country is blacklisted
+      description: check if a country is blocked
       parameters:
       - description: country to check
         in: path
@@ -155,14 +420,326 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.CheckCountryResp'
-      summary: Check blacklisted country
+      summary: Check blocked country
       tags:
-      - blacklist
-  /v1/blacklist/subnets:
+      - Countries
+  /v1/domains/blocklist/exclude:
     delete:
       consumes:
       - application/json
-      description: remove subnets from blacklist
+      description: remove domains from excludelist
+      parameters:
+      - description: domains to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveDomainsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove excluded domains
+      tags:
+      - Domains
+    get:
+      description: get all excluded domains
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetDomainsResp'
+      summary: Get excluded domains
+      tags:
+      - Domains
+    post:
+      consumes:
+      - application/json
+      description: upsert domains to excludelist
+      parameters:
+      - description: domains to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertDomainsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert excluded domains
+      tags:
+      - Domains
+  /v1/domains/blocklist/exclude/{domain}:
+    get:
+      description: check if a domain is excluded
+      parameters:
+      - description: domain to check
+        in: path
+        name: domain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckDomainResp'
+      summary: Check excluded domains
+      tags:
+      - Domains
+  /v1/domains/blocklist/include:
+    delete:
+      consumes:
+      - application/json
+      description: remove domains from includelist
+      parameters:
+      - description: domains to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveDomainsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove included domains
+      tags:
+      - Domains
+    get:
+      description: get all included domains
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetDomainsResp'
+      summary: Get included domains
+      tags:
+      - Domains
+    post:
+      consumes:
+      - application/json
+      description: upsert domains to includelist
+      parameters:
+      - description: domains to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertDomainsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert included domains
+      tags:
+      - Domains
+  /v1/domains/blocklist/include/{domain}:
+    get:
+      description: check if a domain is included
+      parameters:
+      - description: domain to check
+        in: path
+        name: domain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckDomainResp'
+      summary: Check included domains
+      tags:
+      - Domains
+  /v1/ja3/blocklist/exclude:
+    delete:
+      consumes:
+      - application/json
+      description: remove ja3 hashes from excludelist
+      parameters:
+      - description: hashes to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveJA3Req'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove excluded ja3 hashes
+      tags:
+      - JA3
+    get:
+      description: get all excluded ja3 hashes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetJA3Resp'
+      summary: Get excluded ja3 hashes
+      tags:
+      - JA3
+    post:
+      consumes:
+      - application/json
+      description: upsert ja3 hashes to excludelist
+      parameters:
+      - description: hashes to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertJA3Req'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert excluded ja3 hashes
+      tags:
+      - JA3
+  /v1/ja3/blocklist/exclude/{hash}:
+    get:
+      description: check if a ja3 hash is excluded
+      parameters:
+      - description: hash to check
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckJA3Resp'
+      summary: Check excluded ja3 hash
+      tags:
+      - JA3
+  /v1/ja3/blocklist/include:
+    delete:
+      consumes:
+      - application/json
+      description: remove ja3 hashes from includelist
+      parameters:
+      - description: hashes to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveJA3Req'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove included ja3 hashes
+      tags:
+      - JA3
+    get:
+      description: get all included ja3 hashes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetJA3Resp'
+      summary: Get included ja3 hashes
+      tags:
+      - JA3
+    post:
+      consumes:
+      - application/json
+      description: upsert ja3 hashes to includelist
+      parameters:
+      - description: hashes to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertJA3Req'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert included ja3 hashes
+      tags:
+      - JA3
+  /v1/ja3/blocklist/include/{hash}:
+    get:
+      description: check if a ja3 hash is included
+      parameters:
+      - description: hash to check
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckJA3Resp'
+      summary: Check included ja3 hash
+      tags:
+      - JA3
+  /v1/subnets/allowlist:
+    delete:
+      consumes:
+      - application/json
+      description: remove subnets from allowlist
       parameters:
       - description: subnets to remove
         in: body
@@ -179,11 +756,11 @@ paths:
           description: Unprocessable Entity
         "500":
           description: Internal Server Error
-      summary: Remove blacklisted subnets
+      summary: Remove allowed subnets
       tags:
-      - blacklist
+      - Subnets
     get:
-      description: get all blacklisted subnets
+      description: get all allowed subnets
       produces:
       - application/json
       responses:
@@ -191,13 +768,13 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.GetSubnetsResp'
-      summary: Get blacklisted subnets
+      summary: Get allowed subnets
       tags:
-      - blacklist
+      - Subnets
     post:
       consumes:
       - application/json
-      description: upsert subnets to blacklist
+      description: upsert subnets to allowlist
       parameters:
       - description: subnets to add
         in: body
@@ -214,16 +791,16 @@ paths:
           description: Unprocessable Entity
         "500":
           description: Internal Server Error
-      summary: Upsert blacklisted subnets
+      summary: Upsert allowed subnets
       tags:
-      - blacklist
-  /v1/blacklist/subnets/{subnet}:
+      - Subnets
+  /v1/subnets/allowlist/{ip}:
     get:
-      description: check if a subnet is blacklisted
+      description: check if an ip address is allowed
       parameters:
-      - description: subnet to check
+      - description: ip address to check
         in: path
-        name: subnet
+        name: ip
         required: true
         type: string
       produces:
@@ -235,14 +812,14 @@ paths:
             $ref: '#/definitions/api.CheckSubnetResp'
         "400":
           description: Bad Request
-      summary: Check blacklisted subnet
+      summary: Check allowed ip address
       tags:
-      - blacklist
-  /v1/whitelist/subnets:
+      - Subnets
+  /v1/subnets/blocklist/exclude:
     delete:
       consumes:
       - application/json
-      description: remove subnets from whitelist
+      description: remove subnets from excludelist
       parameters:
       - description: subnets to remove
         in: body
@@ -259,11 +836,11 @@ paths:
           description: Unprocessable Entity
         "500":
           description: Internal Server Error
-      summary: Remove whitelisted subnets
+      summary: Remove excluded subnets
       tags:
-      - whitelist
+      - Subnets
     get:
-      description: get all whitelisted subnets
+      description: get all excluded subnets
       produces:
       - application/json
       responses:
@@ -271,13 +848,13 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.GetSubnetsResp'
-      summary: Get whitelisted subnets
+      summary: Get excluded subnets
       tags:
-      - whitelist
+      - Subnets
     post:
       consumes:
       - application/json
-      description: upsert subnets to whitelist
+      description: upsert subnets to excludelist
       parameters:
       - description: subnets to add
         in: body
@@ -294,16 +871,16 @@ paths:
           description: Unprocessable Entity
         "500":
           description: Internal Server Error
-      summary: Upsert whitelisted subnets
+      summary: Upsert excluded subnets
       tags:
-      - whitelist
-  /v1/whitelist/subnets/{subnet}:
+      - Subnets
+  /v1/subnets/blocklist/exclude/{ip}:
     get:
-      description: check if a subnet is whitelisted
+      description: check if an ip address is excluded
       parameters:
-      - description: subnet to check
+      - description: ip address to check
         in: path
-        name: subnet
+        name: ip
         required: true
         type: string
       produces:
@@ -315,7 +892,87 @@ paths:
             $ref: '#/definitions/api.CheckSubnetResp'
         "400":
           description: Bad Request
-      summary: Check whitelisted subnet
+      summary: Check excluded ip address
       tags:
-      - whitelist
+      - Subnets
+  /v1/subnets/blocklist/include:
+    delete:
+      consumes:
+      - application/json
+      description: remove subnets from includelist
+      parameters:
+      - description: subnets to remove
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RemoveSubnetsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Remove included subnets
+      tags:
+      - Subnets
+    get:
+      description: get all included subnets
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GetSubnetsResp'
+      summary: Get included subnets
+      tags:
+      - Subnets
+    post:
+      consumes:
+      - application/json
+      description: upsert subnets to includelist
+      parameters:
+      - description: subnets to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpsertSubnetsReq'
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+        "422":
+          description: Unprocessable Entity
+        "500":
+          description: Internal Server Error
+      summary: Upsert included subnets
+      tags:
+      - Subnets
+  /v1/subnets/blocklist/include/{ip}:
+    get:
+      description: check if an ip address is included
+      parameters:
+      - description: ip address to check
+        in: path
+        name: ip
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CheckSubnetResp'
+        "400":
+          description: Bad Request
+      summary: Check included ip address
+      tags:
+      - Subnets
 swagger: "2.0"

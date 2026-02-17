@@ -18,13 +18,9 @@ type ASNList struct {
 
 func NewASNList() *ASNList {
 	var l ASNList
-	l.list.Store(new(bart.Table[ASN]))
+	l.Store(new(bart.Table[ASN]))
 
 	return &l
-}
-
-func (l *ASNList) Lookup(addr netip.Addr) (ASN, bool) {
-	return l.list.Load().Lookup(addr)
 }
 
 func (l *ASNList) Load() *bart.Table[ASN] {
@@ -33,4 +29,8 @@ func (l *ASNList) Load() *bart.Table[ASN] {
 
 func (l *ASNList) Store(list *bart.Table[ASN]) {
 	l.list.Store(list)
+}
+
+func (l *ASNList) Lookup(addr netip.Addr) (ASN, bool) {
+	return l.Load().Lookup(addr)
 }

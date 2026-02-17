@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	FilterNameWhiteList = "WhiteList"
-	FilterNameBlackList = "BlackList"
+	FilterNameAllowList = "AllowList"
+	FilterNameBlockList = "BlockList"
 )
 
 type FilterType string

@@ -12,6 +12,7 @@ import (
 	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
+	"github.com/cnaize/meds/src/types"
 )
 
 var _ filter.Filter = (*FireHOL)(nil)
@@ -20,9 +21,9 @@ type FireHOL struct {
 	*Base
 }
 
-func NewFireHOL(urls []string, logger *logger.Logger) *FireHOL {
+func NewFireHOL(urls []string, logger *logger.Logger, include, exclude *types.IPList) *FireHOL {
 	return &FireHOL{
-		Base: NewBase(urls, logger),
+		Base: NewBase(urls, logger, include, exclude),
 	}
 }
 
@@ -37,7 +38,7 @@ func (f *FireHOL) Load(ctx context.Context) error {
 }
 
 func (f *FireHOL) Update(ctx context.Context) error {
-	blacklist := new(bart.Lite)
+	blocklist := new(bart.Lite)
 	for _, url := range f.urls {
 		// create request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -65,7 +66,7 @@ func (f *FireHOL) Update(ctx context.Context) error {
 				continue
 			}
 
-			blacklist.Insert(subnet)
+			blocklist.Insert(subnet)
 		}
 	}
 
@@ -73,9 +74,9 @@ func (f *FireHOL) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", blacklist.Size()).
+		Int("size", blocklist.Size()).
 		Msg("Filter updated")
-	f.blacklist.Store(blacklist)
+	f.blocklist.Store(blocklist)
 
 	return nil
 }

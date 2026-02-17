@@ -11,7 +11,7 @@ const docTemplate = `{
         "title": "{{.Title}}",
         "contact": {
             "name": "cnaize",
-            "url": "https://github.com/cnaize/meds"
+            "url": "https://github.com/cnaize"
         },
         "license": {
             "name": "MIT",
@@ -22,16 +22,260 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/blacklist/countries": {
+        "/v1/asns/blocklist/exclude": {
             "get": {
-                "description": "get all blacklisted countries",
+                "description": "get all excluded ASNs",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "blacklist"
+                    "ASNs"
                 ],
-                "summary": "Get blacklisted countries",
+                "summary": "Get excluded ASNs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetASNsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert ASNs to excludelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ASNs"
+                ],
+                "summary": "Upsert excluded ASNs",
+                "parameters": [
+                    {
+                        "description": "ASNs to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertASNsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove ASNs from excludelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ASNs"
+                ],
+                "summary": "Remove excluded ASNs",
+                "parameters": [
+                    {
+                        "description": "ASNs to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveASNsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/asns/blocklist/exclude/{asn}": {
+            "get": {
+                "description": "check if an ASN is excluded",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ASNs"
+                ],
+                "summary": "Check excluded ASN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ASN to check",
+                        "name": "asn",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckASNResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/v1/asns/blocklist/include": {
+            "get": {
+                "description": "get all included ASNs",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ASNs"
+                ],
+                "summary": "Get included ASNs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetASNsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert ASNs to includelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ASNs"
+                ],
+                "summary": "Upsert included ASNs",
+                "parameters": [
+                    {
+                        "description": "ASNs to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertASNsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove ASNs from includelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ASNs"
+                ],
+                "summary": "Remove included ASNs",
+                "parameters": [
+                    {
+                        "description": "ASNs to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveASNsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/asns/blocklist/include/{asn}": {
+            "get": {
+                "description": "check if an ASN is included",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ASNs"
+                ],
+                "summary": "Check included ASN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ASN to check",
+                        "name": "asn",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckASNResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/v1/countries/blocklist": {
+            "get": {
+                "description": "get all blocked countries",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Countries"
+                ],
+                "summary": "Get blocked countries",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -42,14 +286,14 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "upsert countries to blacklist",
+                "description": "upsert countries to blocklist",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
-                    "blacklist"
+                    "Countries"
                 ],
-                "summary": "Upsert blacklisted countries",
+                "summary": "Upsert blocked countries",
                 "parameters": [
                     {
                         "description": "countries to add",
@@ -77,14 +321,14 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "remove countries from blacklist",
+                "description": "remove countries from blocklist",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
-                    "blacklist"
+                    "Countries"
                 ],
-                "summary": "Remove blacklisted countries",
+                "summary": "Remove blocked countries",
                 "parameters": [
                     {
                         "description": "countries to remove",
@@ -112,16 +356,16 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/blacklist/countries/{country}": {
+        "/v1/countries/blocklist/{country}": {
             "get": {
-                "description": "check if a country is blacklisted",
+                "description": "check if a country is blocked",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "blacklist"
+                    "Countries"
                 ],
-                "summary": "Check blacklisted country",
+                "summary": "Check blocked country",
                 "parameters": [
                     {
                         "type": "string",
@@ -141,16 +385,492 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/blacklist/subnets": {
+        "/v1/domains/blocklist/exclude": {
             "get": {
-                "description": "get all blacklisted subnets",
+                "description": "get all excluded domains",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "blacklist"
+                    "Domains"
                 ],
-                "summary": "Get blacklisted subnets",
+                "summary": "Get excluded domains",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetDomainsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert domains to excludelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Domains"
+                ],
+                "summary": "Upsert excluded domains",
+                "parameters": [
+                    {
+                        "description": "domains to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertDomainsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove domains from excludelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Domains"
+                ],
+                "summary": "Remove excluded domains",
+                "parameters": [
+                    {
+                        "description": "domains to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveDomainsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/domains/blocklist/exclude/{domain}": {
+            "get": {
+                "description": "check if a domain is excluded",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Domains"
+                ],
+                "summary": "Check excluded domains",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "domain to check",
+                        "name": "domain",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckDomainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/domains/blocklist/include": {
+            "get": {
+                "description": "get all included domains",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Domains"
+                ],
+                "summary": "Get included domains",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetDomainsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert domains to includelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Domains"
+                ],
+                "summary": "Upsert included domains",
+                "parameters": [
+                    {
+                        "description": "domains to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertDomainsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove domains from includelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Domains"
+                ],
+                "summary": "Remove included domains",
+                "parameters": [
+                    {
+                        "description": "domains to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveDomainsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/domains/blocklist/include/{domain}": {
+            "get": {
+                "description": "check if a domain is included",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Domains"
+                ],
+                "summary": "Check included domains",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "domain to check",
+                        "name": "domain",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckDomainResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/ja3/blocklist/exclude": {
+            "get": {
+                "description": "get all excluded ja3 hashes",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JA3"
+                ],
+                "summary": "Get excluded ja3 hashes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetJA3Resp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert ja3 hashes to excludelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JA3"
+                ],
+                "summary": "Upsert excluded ja3 hashes",
+                "parameters": [
+                    {
+                        "description": "hashes to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertJA3Req"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove ja3 hashes from excludelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JA3"
+                ],
+                "summary": "Remove excluded ja3 hashes",
+                "parameters": [
+                    {
+                        "description": "hashes to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveJA3Req"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/ja3/blocklist/exclude/{hash}": {
+            "get": {
+                "description": "check if a ja3 hash is excluded",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JA3"
+                ],
+                "summary": "Check excluded ja3 hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "hash to check",
+                        "name": "hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckJA3Resp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/ja3/blocklist/include": {
+            "get": {
+                "description": "get all included ja3 hashes",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JA3"
+                ],
+                "summary": "Get included ja3 hashes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetJA3Resp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert ja3 hashes to includelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JA3"
+                ],
+                "summary": "Upsert included ja3 hashes",
+                "parameters": [
+                    {
+                        "description": "hashes to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertJA3Req"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove ja3 hashes from includelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JA3"
+                ],
+                "summary": "Remove included ja3 hashes",
+                "parameters": [
+                    {
+                        "description": "hashes to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveJA3Req"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/ja3/blocklist/include/{hash}": {
+            "get": {
+                "description": "check if a ja3 hash is included",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JA3"
+                ],
+                "summary": "Check included ja3 hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "hash to check",
+                        "name": "hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckJA3Resp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/subnets/allowlist": {
+            "get": {
+                "description": "get all allowed subnets",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subnets"
+                ],
+                "summary": "Get allowed subnets",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -161,14 +881,14 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "upsert subnets to blacklist",
+                "description": "upsert subnets to allowlist",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
-                    "blacklist"
+                    "Subnets"
                 ],
-                "summary": "Upsert blacklisted subnets",
+                "summary": "Upsert allowed subnets",
                 "parameters": [
                     {
                         "description": "subnets to add",
@@ -196,14 +916,14 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "remove subnets from blacklist",
+                "description": "remove subnets from allowlist",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
-                    "blacklist"
+                    "Subnets"
                 ],
-                "summary": "Remove blacklisted subnets",
+                "summary": "Remove allowed subnets",
                 "parameters": [
                     {
                         "description": "subnets to remove",
@@ -231,21 +951,21 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/blacklist/subnets/{subnet}": {
+        "/v1/subnets/allowlist/{ip}": {
             "get": {
-                "description": "check if a subnet is blacklisted",
+                "description": "check if an ip address is allowed",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "blacklist"
+                    "Subnets"
                 ],
-                "summary": "Check blacklisted subnet",
+                "summary": "Check allowed ip address",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "subnet to check",
-                        "name": "subnet",
+                        "description": "ip address to check",
+                        "name": "ip",
                         "in": "path",
                         "required": true
                     }
@@ -263,16 +983,16 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/whitelist/subnets": {
+        "/v1/subnets/blocklist/exclude": {
             "get": {
-                "description": "get all whitelisted subnets",
+                "description": "get all excluded subnets",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "whitelist"
+                    "Subnets"
                 ],
-                "summary": "Get whitelisted subnets",
+                "summary": "Get excluded subnets",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -283,14 +1003,14 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "upsert subnets to whitelist",
+                "description": "upsert subnets to excludelist",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
-                    "whitelist"
+                    "Subnets"
                 ],
-                "summary": "Upsert whitelisted subnets",
+                "summary": "Upsert excluded subnets",
                 "parameters": [
                     {
                         "description": "subnets to add",
@@ -318,14 +1038,14 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "remove subnets from whitelist",
+                "description": "remove subnets from excludelist",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
-                    "whitelist"
+                    "Subnets"
                 ],
-                "summary": "Remove whitelisted subnets",
+                "summary": "Remove excluded subnets",
                 "parameters": [
                     {
                         "description": "subnets to remove",
@@ -353,21 +1073,143 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/whitelist/subnets/{subnet}": {
+        "/v1/subnets/blocklist/exclude/{ip}": {
             "get": {
-                "description": "check if a subnet is whitelisted",
+                "description": "check if an ip address is excluded",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "whitelist"
+                    "Subnets"
                 ],
-                "summary": "Check whitelisted subnet",
+                "summary": "Check excluded ip address",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "subnet to check",
-                        "name": "subnet",
+                        "description": "ip address to check",
+                        "name": "ip",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CheckSubnetResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/v1/subnets/blocklist/include": {
+            "get": {
+                "description": "get all included subnets",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subnets"
+                ],
+                "summary": "Get included subnets",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.GetSubnetsResp"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "upsert subnets to includelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subnets"
+                ],
+                "summary": "Upsert included subnets",
+                "parameters": [
+                    {
+                        "description": "subnets to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpsertSubnetsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "remove subnets from includelist",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subnets"
+                ],
+                "summary": "Remove included subnets",
+                "parameters": [
+                    {
+                        "description": "subnets to remove",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RemoveSubnetsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/v1/subnets/blocklist/include/{ip}": {
+            "get": {
+                "description": "check if an ip address is included",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subnets"
+                ],
+                "summary": "Check included ip address",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ip address to check",
+                        "name": "ip",
                         "in": "path",
                         "required": true
                     }
@@ -387,7 +1229,31 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "api.CheckASNResp": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "boolean"
+                }
+            }
+        },
         "api.CheckCountryResp": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.CheckDomainResp": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.CheckJA3Resp": {
             "type": "object",
             "properties": {
                 "found": {
@@ -403,6 +1269,21 @@ const docTemplate = `{
                 }
             }
         },
+        "api.GetASNsResp": {
+            "type": "object",
+            "properties": {
+                "asns": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "example": [
+                        206831,
+                        400328
+                    ]
+                }
+            }
+        },
         "api.GetCountriesResp": {
             "type": "object",
             "properties": {
@@ -414,6 +1295,36 @@ const docTemplate = `{
                     "example": [
                         "fr",
                         "de"
+                    ]
+                }
+            }
+        },
+        "api.GetDomainsResp": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "good.com",
+                        "bad.com"
+                    ]
+                }
+            }
+        },
+        "api.GetJA3Resp": {
+            "type": "object",
+            "properties": {
+                "hashes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "a50a861119aceb0ccc74902e8fddb618",
+                        "534ce2dbc413c68e908363b5df0ae5e0"
                     ]
                 }
             }
@@ -433,6 +1344,21 @@ const docTemplate = `{
                 }
             }
         },
+        "api.RemoveASNsReq": {
+            "type": "object",
+            "properties": {
+                "asns": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "example": [
+                        206831,
+                        400328
+                    ]
+                }
+            }
+        },
         "api.RemoveCountriesReq": {
             "type": "object",
             "properties": {
@@ -444,6 +1370,36 @@ const docTemplate = `{
                     "example": [
                         "fr",
                         "de"
+                    ]
+                }
+            }
+        },
+        "api.RemoveDomainsReq": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "good.com",
+                        "bad.com"
+                    ]
+                }
+            }
+        },
+        "api.RemoveJA3Req": {
+            "type": "object",
+            "properties": {
+                "hashes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "a50a861119aceb0ccc74902e8fddb618",
+                        "534ce2dbc413c68e908363b5df0ae5e0"
                     ]
                 }
             }
@@ -463,6 +1419,21 @@ const docTemplate = `{
                 }
             }
         },
+        "api.UpsertASNsReq": {
+            "type": "object",
+            "properties": {
+                "asns": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "example": [
+                        206831,
+                        400328
+                    ]
+                }
+            }
+        },
         "api.UpsertCountriesReq": {
             "type": "object",
             "properties": {
@@ -474,6 +1445,36 @@ const docTemplate = `{
                     "example": [
                         "fr",
                         "de"
+                    ]
+                }
+            }
+        },
+        "api.UpsertDomainsReq": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "good.com",
+                        "bad.com"
+                    ]
+                }
+            }
+        },
+        "api.UpsertJA3Req": {
+            "type": "object",
+            "properties": {
+                "hashes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "a50a861119aceb0ccc74902e8fddb618",
+                        "534ce2dbc413c68e908363b5df0ae5e0"
                     ]
                 }
             }
@@ -498,12 +1499,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "v1.1.0",
+	Version:          "v1.2.0",
 	Host:             "",
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Meds: net healing",
-	Description:      "NFQUEUE firewall written in Go",
+	Description:      "Hybrid firewall in Go using public blocklists",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

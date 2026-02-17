@@ -25,9 +25,9 @@ type IPLocate struct {
 	*Base
 }
 
-func NewIPLocate(urls []string, logger *logger.Logger, asnlist *types.ASNList, blacklist *types.CountryList) *IPLocate {
+func NewIPLocate(urls []string, logger *logger.Logger, asnlist *types.ASNList, blocklist *types.CountryList) *IPLocate {
 	return &IPLocate{
-		Base: NewBase(urls, logger, asnlist, blacklist),
+		Base: NewBase(urls, logger, asnlist, blocklist),
 	}
 }
 

@@ -13,15 +13,15 @@ type Base struct {
 	logger *logger.Logger
 
 	asnlist   *types.ASNList
-	blacklist *types.CountryList
+	blocklist *types.CountryList
 }
 
-func NewBase(urls []string, logger *logger.Logger, asnlist *types.ASNList, blacklist *types.CountryList) *Base {
+func NewBase(urls []string, logger *logger.Logger, asnlist *types.ASNList, blocklist *types.CountryList) *Base {
 	return &Base{
 		urls:      urls,
 		logger:    logger,
 		asnlist:   asnlist,
-		blacklist: blacklist,
+		blocklist: blocklist,
 	}
 }
 
@@ -39,5 +39,5 @@ func (f *Base) Check(packet *types.Packet) bool {
 		return true
 	}
 
-	return !f.blacklist.Lookup(asn.Country)
+	return !f.blocklist.Lookup(asn.Country)
 }

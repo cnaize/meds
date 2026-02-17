@@ -2,7 +2,6 @@ package ja3
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
@@ -10,15 +9,20 @@ import (
 )
 
 type Base struct {
-	urls      []string
-	logger    *logger.Logger
-	blacklist atomic.Pointer[map[string]bool]
+	urls   []string
+	logger *logger.Logger
+
+	include   *types.MapList[string]
+	exclude   *types.MapList[string]
+	blocklist *types.MapList[string]
 }
 
-func NewBase(urls []string, logger *logger.Logger) *Base {
+func NewBase(urls []string, logger *logger.Logger, include, exclude *types.MapList[string]) *Base {
 	return &Base{
-		urls:   urls,
-		logger: logger,
+		urls:    urls,
+		logger:  logger,
+		include: include,
+		exclude: exclude,
 	}
 }
 
@@ -27,7 +31,7 @@ func (f *Base) Type() filter.FilterType {
 }
 
 func (f *Base) Load(ctx context.Context) error {
-	f.blacklist.Store(new(map[string]bool))
+	f.blocklist = types.NewMapList[string]()
 
 	return nil
 }
@@ -38,6 +42,11 @@ func (f *Base) Check(packet *types.Packet) bool {
 		return true
 	}
 
-	list := f.blacklist.Load()
-	return !(*list)[hash]
+	// check excludelist
+	if f.exclude.Lookup(hash) {
+		return true
+	}
+
+	// check include/block lists
+	return !(f.include.Lookup(hash) || f.blocklist.Lookup(hash))
 }

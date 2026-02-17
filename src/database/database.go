@@ -13,11 +13,14 @@ import (
 	"github.com/cnaize/meds/src/core/logger"
 )
 
+//go:generate go tool sqlc generate
+//go:generate go tool mockgen -destination=querier_mock.go -package=database . Querier
+
 //go:embed migrations/*
 var migrations string
 
 type Database struct {
-	Q  *Queries
+	Q  Querier
 	DB *sql.DB
 
 	cfg    *config.Config
