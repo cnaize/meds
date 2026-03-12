@@ -1499,12 +1499,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "v1.2.0",
+	Version:          "v1.2.1",
 	Host:             "",
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Meds: net healing",
-	Description:      "Hybrid firewall in Go using public blocklists",
+	Description:      "Hybrid firewall using public blocklists",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -1,8 +1,8 @@
 package api
 
 //	@title			Meds: net healing
-//	@version		v1.2.0
-//	@description	Hybrid firewall in Go using public blocklists
+//	@version		v1.2.1
+//	@description	Hybrid firewall using public blocklists
 //
 //	@contact.name	cnaize
 //	@contact.url	https://github.com/cnaize

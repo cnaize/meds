@@ -178,12 +178,12 @@ info:
   contact:
     name: cnaize
     url: https://github.com/cnaize
-  description: Hybrid firewall in Go using public blocklists
+  description: Hybrid firewall using public blocklists
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
   title: 'Meds: net healing'
-  version: v1.2.0
+  version: v1.2.1
 paths:
   /v1/asns/blocklist/exclude:
     delete:
