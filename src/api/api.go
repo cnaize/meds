@@ -1,7 +1,7 @@
 package api
 
-//	@title			Meds: net healing
-//	@version		v1.2.1
+//	@title			Meds
+//	@version		v1.3.0
 //	@description	Hybrid firewall using public blocklists
 //
 //	@contact.name	cnaize

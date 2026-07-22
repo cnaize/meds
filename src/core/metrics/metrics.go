@@ -10,6 +10,7 @@ type Metrics struct {
 	PacketsDroppedTotal   *prometheus.CounterVec
 	PacketsProcessedTotal prometheus.Counter
 	ErrorsTotal           *prometheus.CounterVec
+	NatsBlockIPCacheStats *stats.Counter
 	RateLimiterCacheStats *stats.Counter
 }
 
@@ -53,6 +54,7 @@ func init() {
 			[]string{"error"},
 		),
 		RateLimiterCacheStats: stats.NewCounter(),
+		NatsBlockIPCacheStats: stats.NewCounter(),
 	}
 }
 

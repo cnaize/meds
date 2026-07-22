@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/cnaize/meds/lib/util"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/types"
@@ -64,7 +63,7 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 				ASN uint32 `json:"asn"`
 			}
 
-			if err := json.Unmarshal(util.StringToBytes(line), &entry); err != nil {
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
 				continue
 			}
 

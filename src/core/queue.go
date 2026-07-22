@@ -102,6 +102,7 @@ func (q *Queue) Run(ctx context.Context) error {
 }
 
 func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	for {
 		q.logger.Raw().Info().Msg("Updating queue...")
 
@@ -126,8 +127,12 @@ func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 			}()
 		}
 
-		// sleep
-		time.Sleep(interval)
+		// wait
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 

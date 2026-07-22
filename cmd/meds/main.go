@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/appleboy/graceful"
+	nserver "github.com/nats-io/nats-server/v2/server"
+	nclient "github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
 
 	"github.com/cnaize/meds/lib/util/get"
@@ -28,6 +30,7 @@ import (
 	geofilter "github.com/cnaize/meds/src/core/filter/geo"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
 	ja3filter "github.com/cnaize/meds/src/core/filter/ja3"
+	natsfilter "github.com/cnaize/meds/src/core/filter/nats"
 	ratefilter "github.com/cnaize/meds/src/core/filter/rate"
 )
 
@@ -44,13 +47,24 @@ func main() {
 	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
+	flag.BoolVar(&cfg.NatsEnabled, "nats-enable", false, "enable nats messaging")
+	flag.StringVar(&cfg.NatsHost, "nats-host", "localhost", "nats server host")
+	flag.IntVar(&cfg.NatsPort, "nats-port", 4222, "nats server port")
+	flag.UintVar(&cfg.NatsBlockIPCacheSize, "nats-block-ip-cache-size", 10_000, "nats cache size for block ip (all entities)")
+	flag.DurationVar(&cfg.NatsBlockIPEntiryTTL, "nats-block-ip-entity-ttl", 3*time.Minute, "nats cache ttl for block ip (per entity)")
 	flag.UintVar(&cfg.LimiterRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
 	flag.UintVar(&cfg.LimiterBurst, "rate-limiter-burst", 1500, "max packets at once (per ip)")
 	flag.UintVar(&cfg.LimiterCacheSize, "rate-limiter-cache-size", 100_000, "rate limiter cache size (all buckets)")
 	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-cache-ttl", 5*time.Minute, "rate limiter cache ttl (per bucket)")
+
 	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
 	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
 	// flag.StringVar(&cfg.Password, "password", "admin", "admin password")
+
+	// NOTE: set using "MEDS_NATS_USERNAME" and "MEDS_NATS_PASSWORD" environment variables
+	// flag.StringVar(&cfg.NatsUsername, "nats-username", "service", "nats username")
+	// flag.StringVar(&cfg.NatsPassword, "nats-password", "service", "nats password")
+
 	flag.Parse()
 
 	// set "debug" for invalid log level
@@ -82,6 +96,10 @@ func main() {
 	if len(cfg.Username) < 1 || len(cfg.Password) < 1 {
 		logger.Raw().Fatal().Msg(`Please set "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables`)
 	}
+
+	// set nats username/password
+	cfg.NatsUsername = os.Getenv("MEDS_NATS_USERNAME")
+	cfg.NatsPassword = os.Getenv("MEDS_NATS_PASSWORD")
 
 	logger.Raw().Info().Msg("Running Meds...")
 
@@ -121,10 +139,37 @@ func main() {
 		logger.Raw().Fatal().Err(err).Msg("domain lists load failed")
 	}
 
+	// start nats
+	var natsServer *nserver.Server
+	var natsClient *nclient.Conn
+	if cfg.NatsEnabled {
+		natsServer, err = nserver.NewServer(&nserver.Options{
+			Host:     cfg.NatsHost,
+			Port:     cfg.NatsPort,
+			Username: cfg.NatsUsername,
+			Password: cfg.NatsPassword,
+		})
+		if err != nil {
+			logger.Raw().Fatal().Err(err).Msg("nats server start failed")
+		}
+
+		go natsServer.Start()
+		if !natsServer.ReadyForConnections(time.Second) {
+			logger.Raw().Fatal().Err(err).Msg("nats server not ready")
+		}
+
+		natsClient, err = nclient.Connect(fmt.Sprintf("%s:%s@%s:%d", cfg.NatsUsername, cfg.NatsPassword, cfg.NatsHost, cfg.NatsPort),
+			nclient.InProcessServer(natsServer))
+		if err != nil {
+			logger.Raw().Fatal().Err(err).Msg("nats client connect failed")
+		}
+	}
+
 	// create filters
 	filters := newFilters(
 		&cfg,
 		logger,
+		natsClient,
 		ipAllowList,
 		countryBlockList,
 		ipIncludeList,
@@ -186,6 +231,14 @@ func main() {
 			logger.Raw().Err(err).Msg("api close failed")
 		}
 
+		// stop nats
+		if cfg.NatsEnabled {
+			if err := natsClient.Drain(); err != nil {
+				logger.Raw().Err(err).Msg("nats client drain failed")
+			}
+			natsServer.Shutdown()
+		}
+
 		// close queue
 		if err := q.Close(); err != nil {
 			logger.Raw().Err(err).Msg("queue close failed")
@@ -237,6 +290,7 @@ func initDatabase(ctx context.Context, cfg *config.Config, logger *logger.Logger
 func newFilters(
 	cfg *config.Config,
 	logger *logger.Logger,
+	natsClient *nclient.Conn,
 	ipAllowList *types.IPList,
 	countryBlocklist *types.CountryList,
 	ipIncludeList *types.IPList,
@@ -251,11 +305,14 @@ func newFilters(
 	// geofilter.IPLocate is responsible for the ASNList updates
 	asnList := types.NewASNList()
 
-	return []filter.Filter{
+	headList := []filter.Filter{
 		// ip allowlist
 		ipfilter.NewAllowList(logger, ipAllowList),
 		// rate filter
 		ratefilter.NewLimiter(cfg.LimiterRate, cfg.LimiterBurst, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
+	}
+
+	tailList := []filter.Filter{
 		// ip filters
 		ipfilter.NewFireHOL([]string{
 			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
@@ -286,6 +343,15 @@ func newFilters(
 			"https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv",
 		}, logger, ja3IncludeList, ja3ExcludeList),
 	}
+
+	// nats filters
+	if cfg.NatsEnabled {
+		blockIP := natsfilter.NewBlockIP(natsClient, cfg.NatsBlockIPCacheSize, cfg.NatsBlockIPEntiryTTL, logger)
+
+		return append(append(headList, blockIP), tailList...)
+	}
+
+	return append(headList, tailList...)
 }
 
 func loadIPLists(ctx context.Context, db *database.Database) (*types.IPList, *types.IPList, error) {

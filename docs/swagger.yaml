@@ -182,8 +182,8 @@ info:
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-  title: 'Meds: net healing'
-  version: v1.2.1
+  title: Meds
+  version: v1.3.0
 paths:
   /v1/asns/blocklist/exclude:
     delete:

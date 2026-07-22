@@ -94,20 +94,6 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 		}
 	}
 
-	// accept trusted packet
-	if packet.IsTrusted() {
-		mark := addMark(a, ConnMarkTrustList)
-		w.nfq.SetVerdictWithOption(
-			*a.PacketID,
-			nfqueue.NfAccept,
-			nfqueue.WithMark(mark),
-			nfqueue.WithConnMark(mark),
-		)
-		w.logger.Log(event.NewAccept(zerolog.InfoLevel, "connection trusted", "trusted packet", filter.FilterTypeEmpty, packet))
-
-		return
-	}
-
 	// accept by default
 	w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
 	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", filter.FilterTypeEmpty, packet))

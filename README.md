@@ -2,18 +2,15 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.2.1-blue)
+![Version](https://img.shields.io/badge/version-v1.3.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cnaize/meds)](https://goreportcard.com/report/github.com/cnaize/meds)
 
 ---
 
-# Meds: net healing  
+# Meds
 > Hybrid firewall using public blocklists
 
 It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in user space, and applies filtering based on public blocklists. Once a connection is checked, the engine "teaches" the Linux kernel to handle it. By assigning **Conntrack marks**, Meds offloads flows back to the kernel space, achieving maximum wire-speed throughput and minimal CPU overhead.
-
-*Designed to cure your network of malicious traffic*
 
 ---
 
@@ -39,10 +36,13 @@ go install github.com/cnaize/meds/cmd/meds@latest
 
 ```bash
 sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
-# Metrics available at: http://localhost:8000/metrics
-# API available at: http://localhost:8000/swagger/index.html
-# Basic Auth: admin / mypass
 ```
+
+### Prometheus metrics  
+👉 http://localhost:8000/metrics  
+
+### Swagger UI  
+👉 http://localhost:8000/swagger/index.html  
 
 ### Command-line options
 ```text
@@ -58,6 +58,16 @@ Usage of ./meds:
     	logger queue length (all workers) (default 2048)
   -loggers-count uint
     	logger workers count (default 3)
+  -nats-block-ip-cache-size uint
+    	nats cache size for block ip (all entities) (default 10000)
+  -nats-block-ip-entity-ttl duration
+    	nats cache ttl for block ip (per entity) (default 3m0s)
+  -nats-enable
+    	enable nats messaging
+  -nats-host string
+    	nats server host (default "localhost")
+  -nats-port int
+    	nats server port (default 4222)
   -rate-limiter-burst uint
     	max packets at once (per ip) (default 1500)
   -rate-limiter-cache-size uint
@@ -77,23 +87,6 @@ Usage of ./meds:
   -workers-count uint
     	nfqueue workers count (per reader) (default 1)
 ```
-
-### Prometheus metrics  
-👉 http://localhost:8000/metrics  
-
-The metrics endpoint is protected by the same **Basic Auth** credentials as the API.
-
-### Swagger UI
-
-**Interactive API docs:**  
-👉 http://localhost:8000/swagger/index.html
-
-You can browse and test all API endpoints directly from your browser.  
-
-**OpenAPI spec (JSON):**  
-👉 http://localhost:8000/swagger/doc.json
-
-You can import this spec into Postman, Insomnia, or Hoppscotch.  
 
 ---
 
@@ -127,7 +120,11 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 │ [DECISION ENGINE]                     │  │
 │  * BLOCK: Mark 0x100000  ──► REPEAT ──┼──┘
 │  * TRUST: Mark 0x200000  ──► ACCEPT   │
-└───────────────────────────────────────┘
+└─────────────────────────▲─────────────┘
+                          │
+               ┌──────────┴─────────────┐
+               │ EMBEDDED NATS SERVER ◄─┼──[External]
+               └────────────────────────┘
 ```
 
 - **Early Drop**: Blocked traffic (`0x100000`) is handled by the kernel immediately. This ensures that known threats are dropped at the earliest possible stage, eliminating unnecessary context switches and user-space overhead.
@@ -135,6 +132,8 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 - **Stateful Acceleration**: Once a connection is verified as Trusted (`0x200000`), it is offloaded to the kernel's fast path. Subsequent packets in the flow are processed entirely in-kernel at wire-speed, eliminating user-space overhead for established sessions.
 
 - **Deep Inspection**: Only new or unclassified traffic (the "Decision Phase") is sent to Meds for deep L3/L4/L7 analysis. This phase is limited to a **10-packet window** to extract metadata (DNS, SNI, JA3) before the kernel takes over.
+
+- **Reactive Threat Offloading**: External applications can stream detected malicious IPs to NATS (`meds.block.ip` subject). Meds intercepts these events asynchronously and drops malicious flows.
 
 ---
 
@@ -145,6 +144,9 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 
 - **Intelligent NFQUEUE Balancing**  
   Intercepts traffic using `NFQUEUE` with `balance` and `bypass` options, ensuring multi-core scaling and system stability even if the user-space process is restarted.
+
+- **Embedded NATS**  
+  Exposes an asynchronous reactive API for external applications to offload detected threat vectors to the L3/L4 network layer instantly.
 
 - **Lock-free Core Architecture**  
   The core engine is built for high-concurrency performance: no mutexes in the hot path. All filtering, counters, and rate-limiters utilize atomic operations.
@@ -189,20 +191,18 @@ You can import this spec into Postman, Insomnia, or Hoppscotch.
 ```text
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="default"} 12021
-meds_core_packets_accepted_total{filter="empty",reason="trusted packet"} 420
-meds_core_packets_accepted_total{filter="ip",reason="AllowList"} 139
+meds_core_packets_accepted_total{filter="empty",reason="default"} 44344
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 263
-meds_core_packets_dropped_total{filter="domain",reason="StevenBlack"} 3
-meds_core_packets_dropped_total{filter="geo",reason="IPLocate"} 43
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 1443
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 1732
+meds_core_packets_dropped_total{filter="domain",reason="StevenBlack"} 2
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 6705
+meds_core_packets_dropped_total{filter="ip",reason="Nats"} 432
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 14332
+meds_core_packets_processed_total 53215
 ```
 
 ---

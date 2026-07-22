@@ -64,18 +64,6 @@ func NewPacket(payload []byte) *Packet {
 	}
 }
 
-func (p *Packet) IsTrusted() bool {
-	if _, ok := p.packet.Layer(layers.LayerTypeTCP).(*layers.TCP); ok {
-		return p.isStored(packetKeyTLS)
-	}
-
-	if _, ok := p.packet.Layer(layers.LayerTypeDNS).(*layers.DNS); ok {
-		return false
-	}
-
-	return true
-}
-
 func (p *Packet) GetProto() (layers.IPProtocol, bool) {
 	// check
 	if p.isTouched(packetKeyProto) {

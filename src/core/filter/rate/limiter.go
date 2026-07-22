@@ -53,7 +53,8 @@ func (f *Limiter) Type() filter.FilterType {
 }
 
 func (f *Limiter) Load(ctx context.Context) error {
-	cache, err := otter.New(
+	var err error
+	f.cache, err = otter.New(
 		&otter.Options[netip.Addr, *Bucket]{
 			MaximumSize:      int(f.cacheSize),
 			ExpiryCalculator: otter.ExpiryAccessing[netip.Addr, *Bucket](f.bucketTTL),
@@ -71,7 +72,6 @@ func (f *Limiter) Load(ctx context.Context) error {
 	}
 
 	f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
-	f.cache = cache
 
 	return nil
 }
@@ -90,7 +90,7 @@ func (f *Limiter) Check(packet *types.Packet) bool {
 		),
 	)
 	if err != nil {
-		f.logger.Raw().Warn().Err(err).Msg("get bucket failed")
+		f.logger.Raw().Warn().Err(err).Str("name", f.Name()).Str("type", string(f.Type())).Msg("get bucket failed")
 		return true
 	}
 
