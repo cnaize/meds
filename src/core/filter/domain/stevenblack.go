@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
+	"github.com/nats-io/nats.go"
 
 	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
@@ -21,9 +22,9 @@ type StevenBlack struct {
 	*Base
 }
 
-func NewStevenBlack(urls []string, logger *logger.Logger, include, exclude *types.DomainList) *StevenBlack {
+func NewStevenBlack(urls []string, nc *nats.Conn, logger *logger.Logger, include, exclude *types.DomainList) *StevenBlack {
 	return &StevenBlack{
-		Base: NewBase(urls, logger, include, exclude),
+		Base: NewBase(urls, nc, logger, include, exclude),
 	}
 }
 

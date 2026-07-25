@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/nats-io/nats.go"
+
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/types"
@@ -18,9 +20,9 @@ type Abuse struct {
 	*Base
 }
 
-func NewAbuse(urls []string, logger *logger.Logger, include, exclude *types.MapList[string]) *Abuse {
+func NewAbuse(urls []string, nc *nats.Conn, logger *logger.Logger, include, exclude *types.MapList[string]) *Abuse {
 	return &Abuse{
-		Base: NewBase(urls, logger, include, exclude),
+		Base: NewBase(urls, nc, logger, include, exclude),
 	}
 }
 

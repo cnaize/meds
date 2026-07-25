@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/maypok86/otter/v2"
+	"github.com/nats-io/nats.go"
 
+	"github.com/cnaize/meds/pkg"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/core/metrics"
@@ -23,18 +25,20 @@ type Limiter struct {
 	cacheSize uint
 	bucketTTL time.Duration
 
+	nc     *nats.Conn
 	logger *logger.Logger
 
 	cache *otter.Cache[netip.Addr, *Bucket]
 	bpool sync.Pool
 }
 
-func NewLimiter(rate, burst, cacheSize uint, bucketTTL time.Duration, logger *logger.Logger) *Limiter {
+func NewLimiter(rate, burst, cacheSize uint, bucketTTL time.Duration, nc *nats.Conn, logger *logger.Logger) *Limiter {
 	return &Limiter{
 		rate:      rate,
 		burst:     burst,
 		cacheSize: cacheSize,
 		bucketTTL: bucketTTL,
+		nc:        nc,
 		logger:    logger,
 		bpool: sync.Pool{
 			New: func() any {
@@ -94,7 +98,13 @@ func (f *Limiter) Check(packet *types.Packet) bool {
 		return true
 	}
 
-	return bucket.Allow(f.rate, f.burst)
+	if !bucket.Allow(f.rate, f.burst) {
+		// add src ip to quarantine
+		f.nc.Publish(pkg.NatsSubjectQuarantineIPAdd, []byte(srcIP.String()))
+		return false
+	}
+
+	return true
 }
 
 func (f *Limiter) Update(ctx context.Context) error {

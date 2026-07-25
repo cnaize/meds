@@ -6,12 +6,12 @@ import (
 )
 
 type Metrics struct {
-	PacketsAcceptedTotal  *prometheus.CounterVec
-	PacketsDroppedTotal   *prometheus.CounterVec
-	PacketsProcessedTotal prometheus.Counter
-	ErrorsTotal           *prometheus.CounterVec
-	NatsBlockIPCacheStats *stats.Counter
-	RateLimiterCacheStats *stats.Counter
+	PacketsAcceptedTotal   *prometheus.CounterVec
+	PacketsDroppedTotal    *prometheus.CounterVec
+	PacketsProcessedTotal  prometheus.Counter
+	ErrorsTotal            *prometheus.CounterVec
+	RateLimiterCacheStats  *stats.Counter
+	QuarantineIPCacheStats *stats.Counter
 }
 
 var metrics *Metrics
@@ -53,8 +53,8 @@ func init() {
 			},
 			[]string{"error"},
 		),
-		RateLimiterCacheStats: stats.NewCounter(),
-		NatsBlockIPCacheStats: stats.NewCounter(),
+		RateLimiterCacheStats:  stats.NewCounter(),
+		QuarantineIPCacheStats: stats.NewCounter(),
 	}
 }
 

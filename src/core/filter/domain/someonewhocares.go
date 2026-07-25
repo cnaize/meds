@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/armon/go-radix"
+	"github.com/nats-io/nats.go"
 
 	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
@@ -21,9 +22,9 @@ type SomeoneWhoCares struct {
 	*Base
 }
 
-func NewSomeoneWhoCares(urls []string, logger *logger.Logger, include, exclude *types.DomainList) *SomeoneWhoCares {
+func NewSomeoneWhoCares(urls []string, nc *nats.Conn, logger *logger.Logger, include, exclude *types.DomainList) *SomeoneWhoCares {
 	return &SomeoneWhoCares{
-		Base: NewBase(urls, logger, include, exclude),
+		Base: NewBase(urls, nc, logger, include, exclude),
 	}
 }
 

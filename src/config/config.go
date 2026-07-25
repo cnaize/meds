@@ -21,14 +21,14 @@ type Config struct {
 	Password      string
 	APIServerAddr string
 	// nats server
-	NatsEnabled  bool
+	NatsEnable   bool
 	NatsHost     string
 	NatsPort     int
 	NatsUsername string
 	NatsPassword string
-	// nats filter
-	NatsBlockIPCacheSize uint
-	NatsBlockIPEntiryTTL time.Duration
+	// quarantine filter
+	QuarantineIPCacheSize uint
+	QuarantineIPEntityTTL time.Duration
 	// rate limiter
 	LimiterRate      uint
 	LimiterBurst     uint

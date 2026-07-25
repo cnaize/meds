@@ -1,3 +1,7 @@
 package pkg
 
-const NatsSubjectBlockIP = "meds.block.ip"
+const (
+	NatsSubjectQuarantineIP    = "meds.quarantine.ip"
+	NatsSubjectQuarantineIPAdd = "meds.quarantine.ip.add"
+	NatsSubjectQuarantineIPDel = "meds.quarantine.ip.del"
+)

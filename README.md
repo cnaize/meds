@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.3.0-blue)
+![Version](https://img.shields.io/badge/version-v1.3.1-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ---
@@ -22,10 +22,6 @@ It integrates with Linux Netfilter via **NFQUEUE**, inspects inbound traffic in 
 
 The application manages iptables and conntrack rules automatically.
 
-### Download
-
-Download the latest binary from [Releases](https://github.com/cnaize/meds/releases) or install via Go.
-
 ### Install via Go
 
 ```bash
@@ -35,7 +31,7 @@ go install github.com/cnaize/meds/cmd/meds@latest
 ## 🧩 Quickstart
 
 ```bash
-sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
+sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass meds
 ```
 
 ### Prometheus metrics  
@@ -46,8 +42,7 @@ sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass ./meds
 
 ### Command-line options
 ```text
-./meds -help
-Usage of ./meds:
+Usage of meds:
   -api-addr string
     	api server address (default ":8000")
   -db-path string
@@ -58,22 +53,22 @@ Usage of ./meds:
     	logger queue length (all workers) (default 2048)
   -loggers-count uint
     	logger workers count (default 3)
-  -nats-block-ip-cache-size uint
-    	nats cache size for block ip (all entities) (default 10000)
-  -nats-block-ip-entity-ttl duration
-    	nats cache ttl for block ip (per entity) (default 3m0s)
   -nats-enable
-    	enable nats messaging
+    	enable nats server
   -nats-host string
     	nats server host (default "localhost")
   -nats-port int
     	nats server port (default 4222)
+  -quarantine-ip-cache-size uint
+    	quarantine ip cache size (all entities) (default 10000)
+  -quarantine-ip-entity-ttl duration
+    	quarantine ip cache ttl (per entity) (default 3m0s)
+  -rate-limiter-bucket-ttl duration
+    	rate limiter cache ttl (per bucket) (default 5m0s)
   -rate-limiter-burst uint
     	max packets at once (per ip) (default 1500)
   -rate-limiter-cache-size uint
     	rate limiter cache size (all buckets) (default 100000)
-  -rate-limiter-cache-ttl duration
-    	rate limiter cache ttl (per bucket) (default 5m0s)
   -rate-limiter-rate uint
     	max packets per second (per ip) (default 3000)
   -reader-queue-len uint
@@ -113,16 +108,17 @@ Usage of ./meds:
 ┌─────────────────────────▼─────────────┐  │
 │ USER SPACE (Meds Firewall)            │  │
 │ ───────────────────────────────────── │  │
-│  1. Rate Limiter (per source IP)      │  │
-│  2. L3/L4 Filters (IP, Geo, ASN)      │  │
-│  3. L7 Inspection (DNS, SNI, TLS JA3) │  │
-│                                       │  │
-│ [DECISION ENGINE]                     │  │
-│  * BLOCK: Mark 0x100000  ──► REPEAT ──┼──┘
-│  * TRUST: Mark 0x200000  ──► ACCEPT   │
-└─────────────────────────▲─────────────┘
-                          │
-               ┌──────────┴─────────────┐
+│  1. Quarantine      ◄──[SUB]──┐       │  │
+│  2. Rate Limiter    ───[PUB]──┤       │  │
+│  3. L3/L4 Filters             │       │  │
+│  4. L7 Inspection   ───[PUB]──┤       │  │
+│                               │       │  │
+│  [DECISION ENGINE]            │       │  │
+│  * BLOCK: 0x100000  ──────────┼───────┼──┘
+│  * TRUST: 0x200000            │       │
+└───────────────────────────────┼───────┘
+                              [PUB]
+               ┌────────────────┴───────┐
                │ EMBEDDED NATS SERVER ◄─┼──[External]
                └────────────────────────┘
 ```
@@ -133,7 +129,9 @@ Usage of ./meds:
 
 - **Deep Inspection**: Only new or unclassified traffic (the "Decision Phase") is sent to Meds for deep L3/L4/L7 analysis. This phase is limited to a **10-packet window** to extract metadata (DNS, SNI, JA3) before the kernel takes over.
 
-- **Reactive Threat Offloading**: External applications can stream detected malicious IPs to NATS (`meds.block.ip` subject). Meds intercepts these events asynchronously and drops malicious flows.
+- **Reactive Threat Offloading**: External applications or internal filters can stream detected malicious IPs to the embedded NATS server:
+  - Publish to `meds.quarantine.ip.add` (payload: `"1.2.3.4"`) to add the IP to the quarantine
+  - Publish to `meds.quarantine.ip.del` (payload: `"1.2.3.4"`) to delete the IP from the quarantine
 
 ---
 
@@ -146,7 +144,7 @@ Usage of ./meds:
   Intercepts traffic using `NFQUEUE` with `balance` and `bypass` options, ensuring multi-core scaling and system stability even if the user-space process is restarted.
 
 - **Embedded NATS**  
-  Exposes an asynchronous reactive API for external applications to offload detected threat vectors to the L3/L4 network layer instantly.
+  Exposes an asynchronous reactive API for external applications to offload detected threat vectors to the L3/L4 network layer quarantine.
 
 - **Lock-free Core Architecture**  
   The core engine is built for high-concurrency performance: no mutexes in the hot path. All filtering, counters, and rate-limiters utilize atomic operations.
@@ -191,18 +189,17 @@ Usage of ./meds:
 ```text
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="default"} 44344
+meds_core_packets_accepted_total{filter="empty",reason="default"} 11209
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 1732
-meds_core_packets_dropped_total{filter="domain",reason="StevenBlack"} 2
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 6705
-meds_core_packets_dropped_total{filter="ip",reason="Nats"} 432
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 45
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 2538
+meds_core_packets_dropped_total{filter="ip",reason="Quarantine"} 70
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 53215
+meds_core_packets_processed_total 13862
 ```
 
 ---

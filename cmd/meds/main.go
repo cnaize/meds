@@ -30,7 +30,7 @@ import (
 	geofilter "github.com/cnaize/meds/src/core/filter/geo"
 	ipfilter "github.com/cnaize/meds/src/core/filter/ip"
 	ja3filter "github.com/cnaize/meds/src/core/filter/ja3"
-	natsfilter "github.com/cnaize/meds/src/core/filter/nats"
+	quarantinefilter "github.com/cnaize/meds/src/core/filter/quarantine"
 	ratefilter "github.com/cnaize/meds/src/core/filter/rate"
 )
 
@@ -47,15 +47,15 @@ func main() {
 	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
-	flag.BoolVar(&cfg.NatsEnabled, "nats-enable", false, "enable nats messaging")
+	flag.BoolVar(&cfg.NatsEnable, "nats-enable", false, "enable nats server")
 	flag.StringVar(&cfg.NatsHost, "nats-host", "localhost", "nats server host")
 	flag.IntVar(&cfg.NatsPort, "nats-port", 4222, "nats server port")
-	flag.UintVar(&cfg.NatsBlockIPCacheSize, "nats-block-ip-cache-size", 10_000, "nats cache size for block ip (all entities)")
-	flag.DurationVar(&cfg.NatsBlockIPEntiryTTL, "nats-block-ip-entity-ttl", 3*time.Minute, "nats cache ttl for block ip (per entity)")
+	flag.UintVar(&cfg.QuarantineIPCacheSize, "quarantine-ip-cache-size", 10_000, "quarantine ip cache size (all entities)")
+	flag.DurationVar(&cfg.QuarantineIPEntityTTL, "quarantine-ip-entity-ttl", 3*time.Minute, "quarantine ip cache ttl (per entity)")
 	flag.UintVar(&cfg.LimiterRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
 	flag.UintVar(&cfg.LimiterBurst, "rate-limiter-burst", 1500, "max packets at once (per ip)")
 	flag.UintVar(&cfg.LimiterCacheSize, "rate-limiter-cache-size", 100_000, "rate limiter cache size (all buckets)")
-	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-cache-ttl", 5*time.Minute, "rate limiter cache ttl (per bucket)")
+	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-bucket-ttl", 5*time.Minute, "rate limiter cache ttl (per bucket)")
 
 	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
 	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
@@ -139,30 +139,28 @@ func main() {
 		logger.Raw().Fatal().Err(err).Msg("domain lists load failed")
 	}
 
-	// start nats
-	var natsServer *nserver.Server
-	var natsClient *nclient.Conn
-	if cfg.NatsEnabled {
-		natsServer, err = nserver.NewServer(&nserver.Options{
-			Host:     cfg.NatsHost,
-			Port:     cfg.NatsPort,
-			Username: cfg.NatsUsername,
-			Password: cfg.NatsPassword,
-		})
-		if err != nil {
-			logger.Raw().Fatal().Err(err).Msg("nats server start failed")
-		}
+	// create nats server
+	natsServer, err := nserver.NewServer(&nserver.Options{
+		Host:       cfg.NatsHost,
+		Port:       cfg.NatsPort,
+		Username:   cfg.NatsUsername,
+		Password:   cfg.NatsPassword,
+		DontListen: !cfg.NatsEnable,
+	})
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("nats server start failed")
+	}
 
-		go natsServer.Start()
-		if !natsServer.ReadyForConnections(time.Second) {
-			logger.Raw().Fatal().Err(err).Msg("nats server not ready")
-		}
+	// start nats server
+	go natsServer.Start()
+	if !natsServer.ReadyForConnections(5 * time.Second) {
+		logger.Raw().Fatal().Err(err).Msg("nats server not ready")
+	}
 
-		natsClient, err = nclient.Connect(fmt.Sprintf("%s:%s@%s:%d", cfg.NatsUsername, cfg.NatsPassword, cfg.NatsHost, cfg.NatsPort),
-			nclient.InProcessServer(natsServer))
-		if err != nil {
-			logger.Raw().Fatal().Err(err).Msg("nats client connect failed")
-		}
+	// create nats client
+	natsClient, err := nclient.Connect("", nclient.InProcessServer(natsServer))
+	if err != nil {
+		logger.Raw().Fatal().Err(err).Msg("nats client connect failed")
 	}
 
 	// create filters
@@ -232,12 +230,10 @@ func main() {
 		}
 
 		// stop nats
-		if cfg.NatsEnabled {
-			if err := natsClient.Drain(); err != nil {
-				logger.Raw().Err(err).Msg("nats client drain failed")
-			}
-			natsServer.Shutdown()
+		if err := natsClient.Drain(); err != nil {
+			logger.Raw().Err(err).Msg("nats client drain failed")
 		}
+		natsServer.Shutdown()
 
 		// close queue
 		if err := q.Close(); err != nil {
@@ -305,14 +301,13 @@ func newFilters(
 	// geofilter.IPLocate is responsible for the ASNList updates
 	asnList := types.NewASNList()
 
-	headList := []filter.Filter{
+	return []filter.Filter{
 		// ip allowlist
 		ipfilter.NewAllowList(logger, ipAllowList),
+		// quarantine filter
+		quarantinefilter.NewQuarantineIP(cfg.QuarantineIPCacheSize, cfg.QuarantineIPEntityTTL, natsClient, logger),
 		// rate filter
-		ratefilter.NewLimiter(cfg.LimiterRate, cfg.LimiterBurst, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, logger),
-	}
-
-	tailList := []filter.Filter{
+		ratefilter.NewLimiter(cfg.LimiterRate, cfg.LimiterBurst, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, natsClient, logger),
 		// ip filters
 		ipfilter.NewFireHOL([]string{
 			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
@@ -334,24 +329,15 @@ func newFilters(
 		// dns/sni filters
 		domainfilter.NewStevenBlack([]string{
 			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-		}, logger, domainIncludeList, domainExcludeList),
+		}, natsClient, logger, domainIncludeList, domainExcludeList),
 		domainfilter.NewSomeoneWhoCares([]string{
 			"https://someonewhocares.org/hosts/hosts",
-		}, logger, domainIncludeList, domainExcludeList),
+		}, natsClient, logger, domainIncludeList, domainExcludeList),
 		// ja3 filters
 		ja3filter.NewAbuse([]string{
 			"https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv",
-		}, logger, ja3IncludeList, ja3ExcludeList),
+		}, natsClient, logger, ja3IncludeList, ja3ExcludeList),
 	}
-
-	// nats filters
-	if cfg.NatsEnabled {
-		blockIP := natsfilter.NewBlockIP(natsClient, cfg.NatsBlockIPCacheSize, cfg.NatsBlockIPEntiryTTL, logger)
-
-		return append(append(headList, blockIP), tailList...)
-	}
-
-	return append(headList, tailList...)
 }
 
 func loadIPLists(ctx context.Context, db *database.Database) (*types.IPList, *types.IPList, error) {

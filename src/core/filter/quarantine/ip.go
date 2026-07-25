@@ -1,4 +1,4 @@
-package nats
+package quarantine
 
 import (
 	"context"
@@ -17,63 +17,62 @@ import (
 	"github.com/cnaize/meds/src/types"
 )
 
-var _ filter.Filter = (*BlockIP)(nil)
+var _ filter.Filter = (*QuarantineIP)(nil)
 
-type BlockIP struct {
+type QuarantineIP struct {
 	cacheSize uint
 	entityTTL time.Duration
 
+	nc     *nats.Conn
 	logger *logger.Logger
 
-	nc  *nats.Conn
-	sub *nats.Subscription
-
+	sub   *nats.Subscription
 	cache *otter.Cache[netip.Addr, struct{}]
 }
 
-func NewBlockIP(nc *nats.Conn, cacheSize uint, entityTTL time.Duration, logger *logger.Logger) *BlockIP {
-	return &BlockIP{
-		nc:        nc,
+func NewQuarantineIP(cacheSize uint, entityTTL time.Duration, nc *nats.Conn, logger *logger.Logger) *QuarantineIP {
+	return &QuarantineIP{
 		cacheSize: cacheSize,
 		entityTTL: entityTTL,
+		nc:        nc,
 		logger:    logger,
 	}
 }
 
-func (f *BlockIP) Name() string {
-	return "Nats"
+func (f *QuarantineIP) Name() string {
+	return "Quarantine"
 }
 
-func (f *BlockIP) Type() filter.FilterType {
+func (f *QuarantineIP) Type() filter.FilterType {
 	return filter.FilterTypeIP
 }
 
-func (f *BlockIP) Load(ctx context.Context) error {
+func (f *QuarantineIP) Load(ctx context.Context) error {
 	var err error
 	f.cache, err = otter.New(
 		&otter.Options[netip.Addr, struct{}]{
 			MaximumSize:      int(f.cacheSize),
 			ExpiryCalculator: otter.ExpiryAccessing[netip.Addr, struct{}](f.entityTTL),
-			StatsRecorder:    metrics.Get().NatsBlockIPCacheStats,
+			StatsRecorder:    metrics.Get().QuarantineIPCacheStats,
 		},
 	)
 	if err != nil {
 		return fmt.Errorf("new cache: %w", err)
 	}
 
-	f.sub, err = f.nc.SubscribeSync(pkg.NatsSubjectBlockIP)
+	f.sub, err = f.nc.SubscribeSync(pkg.NatsSubjectQuarantineIP + ".*")
 	if err != nil {
-		return fmt.Errorf("%s: subscribe subject: %w", pkg.NatsSubjectBlockIP, err)
+		return fmt.Errorf("%s: subscribe subject: %w", pkg.NatsSubjectQuarantineIP, err)
 	}
 
-	go f.natsLoop(ctx)
+	go f.natsHandler(ctx)
 
 	f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
 
 	return nil
 }
 
-func (f *BlockIP) Check(packet *types.Packet) bool {
+func (f *QuarantineIP) Check(packet *types.Packet) bool {
 	srcIP, ok := packet.GetSrcIP()
 	if !ok {
 		return true
@@ -86,11 +85,11 @@ func (f *BlockIP) Check(packet *types.Packet) bool {
 	return true
 }
 
-func (f *BlockIP) Update(ctx context.Context) error {
+func (f *QuarantineIP) Update(ctx context.Context) error {
 	return nil
 }
 
-func (f *BlockIP) natsLoop(ctx context.Context) {
+func (f *QuarantineIP) natsHandler(ctx context.Context) {
 	defer f.sub.Unsubscribe()
 
 	for {
@@ -112,6 +111,11 @@ func (f *BlockIP) natsLoop(ctx context.Context) {
 			continue
 		}
 
-		f.cache.Set(ip, struct{}{})
+		switch msg.Subject {
+		case pkg.NatsSubjectQuarantineIPAdd:
+			f.cache.Set(ip, struct{}{})
+		case pkg.NatsSubjectQuarantineIPDel:
+			f.cache.Invalidate(ip)
+		}
 	}
 }

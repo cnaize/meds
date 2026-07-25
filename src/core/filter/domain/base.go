@@ -3,13 +3,18 @@ package domain
 import (
 	"context"
 
+	"github.com/nats-io/nats.go"
+
+	"github.com/cnaize/meds/pkg"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/types"
 )
 
 type Base struct {
-	urls   []string
+	urls []string
+
+	nc     *nats.Conn
 	logger *logger.Logger
 
 	include   *types.DomainList
@@ -17,9 +22,10 @@ type Base struct {
 	blocklist *types.DomainList
 }
 
-func NewBase(urls []string, logger *logger.Logger, include, exclude *types.DomainList) *Base {
+func NewBase(urls []string, nc *nats.Conn, logger *logger.Logger, include, exclude *types.DomainList) *Base {
 	return &Base{
 		urls:    urls,
+		nc:      nc,
 		logger:  logger,
 		include: include,
 		exclude: exclude,
@@ -45,6 +51,10 @@ func (f *Base) Check(packet *types.Packet) bool {
 
 		// check include/block lists
 		if f.include.Lookup(domain) || f.blocklist.Lookup(domain) {
+			// add src ip to quarantine
+			if srcIP, ok := packet.GetSrcIP(); ok {
+				f.nc.Publish(pkg.NatsSubjectQuarantineIPAdd, []byte(srcIP.String()))
+			}
 			return false
 		}
 	}

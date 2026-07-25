@@ -3,13 +3,18 @@ package ja3
 import (
 	"context"
 
+	"github.com/nats-io/nats.go"
+
+	"github.com/cnaize/meds/pkg"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/types"
 )
 
 type Base struct {
-	urls   []string
+	urls []string
+
+	nc     *nats.Conn
 	logger *logger.Logger
 
 	include   *types.MapList[string]
@@ -17,9 +22,10 @@ type Base struct {
 	blocklist *types.MapList[string]
 }
 
-func NewBase(urls []string, logger *logger.Logger, include, exclude *types.MapList[string]) *Base {
+func NewBase(urls []string, nc *nats.Conn, logger *logger.Logger, include, exclude *types.MapList[string]) *Base {
 	return &Base{
 		urls:    urls,
+		nc:      nc,
 		logger:  logger,
 		include: include,
 		exclude: exclude,
@@ -48,5 +54,13 @@ func (f *Base) Check(packet *types.Packet) bool {
 	}
 
 	// check include/block lists
-	return !(f.include.Lookup(hash) || f.blocklist.Lookup(hash))
+	if f.include.Lookup(hash) || f.blocklist.Lookup(hash) {
+		// add src ip to quarantine
+		if srcIP, ok := packet.GetSrcIP(); ok {
+			f.nc.Publish(pkg.NatsSubjectQuarantineIPAdd, []byte(srcIP.String()))
+		}
+		return false
+	}
+
+	return true
 }
