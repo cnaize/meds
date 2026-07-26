@@ -265,17 +265,22 @@ func initDatabase(ctx context.Context, cfg *config.Config, logger *logger.Logger
 
 	// prefill database
 	if isNewDatabase {
-		ipExcludeList := []netip.Prefix{
-			netip.MustParsePrefix("0.0.0.0/8"),
-			netip.MustParsePrefix("10.0.0.0/8"),
+		ipAllowList := []netip.Prefix{
 			netip.MustParsePrefix("127.0.0.0/8"),
+			netip.MustParsePrefix("169.254.0.0/16"),
+			netip.MustParsePrefix("198.18.0.0/15"),
+			netip.MustParsePrefix("224.0.0.0/4"),
+			netip.MustParsePrefix("240.0.0.0/4"),
+			// for local PC only, otherwise remove it using API
+			netip.MustParsePrefix("10.0.0.0/8"),
+			netip.MustParsePrefix("100.64.0.0/10"),
 			netip.MustParsePrefix("172.16.0.0/12"),
 			netip.MustParsePrefix("192.168.0.0/16"),
 		}
 
-		for _, subnet := range ipExcludeList {
-			if err := db.Q.UpsertIPExcludeList(ctx, db.DB, subnet.String()); err != nil {
-				return nil, fmt.Errorf("prefill ip excludelist: %w", err)
+		for _, subnet := range ipAllowList {
+			if err := db.Q.UpsertIPAllowList(ctx, db.DB, subnet.String()); err != nil {
+				return nil, fmt.Errorf("prefill ip allowlist: %w", err)
 			}
 		}
 	}

@@ -189,17 +189,18 @@ Usage of meds:
 ```text
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="default"} 11209
+meds_core_packets_accepted_total{filter="empty",reason="default"} 5622
+meds_core_packets_accepted_total{filter="ip",reason="AllowList"} 117
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 45
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 2538
-meds_core_packets_dropped_total{filter="ip",reason="Quarantine"} 70
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 11
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 572
+meds_core_packets_dropped_total{filter="ip",reason="Quarantine"} 19
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 13862
+meds_core_packets_processed_total 6341
 ```
 
 ---

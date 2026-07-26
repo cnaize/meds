@@ -27,7 +27,7 @@ func SrcIP(packet gopacket.Packet) (netip.Addr, bool) {
 		return netip.Addr{}, false
 	}
 
-	return netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP)), true
+	return netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP)).Unmap(), true
 }
 
 func DstIP(packet gopacket.Packet) (netip.Addr, bool) {
@@ -36,7 +36,7 @@ func DstIP(packet gopacket.Packet) (netip.Addr, bool) {
 		return netip.Addr{}, false
 	}
 
-	return netip.AddrFrom4(*(*[4]byte)(ip4.DstIP)), true
+	return netip.AddrFrom4(*(*[4]byte)(ip4.DstIP)).Unmap(), true
 }
 
 func SrcPort(packet gopacket.Packet) (uint16, bool) {
