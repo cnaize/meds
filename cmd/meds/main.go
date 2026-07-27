@@ -62,8 +62,8 @@ func main() {
 	// flag.StringVar(&cfg.Password, "password", "admin", "admin password")
 
 	// NOTE: set using "MEDS_NATS_USERNAME" and "MEDS_NATS_PASSWORD" environment variables
-	// flag.StringVar(&cfg.NatsUsername, "nats-username", "service", "nats username")
-	// flag.StringVar(&cfg.NatsPassword, "nats-password", "service", "nats password")
+	// flag.StringVar(&cfg.NatsUsername, "nats-username", "meds", "nats username")
+	// flag.StringVar(&cfg.NatsPassword, "nats-password", "meds", "nats password")
 
 	flag.Parse()
 
@@ -97,9 +97,14 @@ func main() {
 		logger.Raw().Fatal().Msg(`Please set "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables`)
 	}
 
-	// set nats username/password
-	cfg.NatsUsername = os.Getenv("MEDS_NATS_USERNAME")
-	cfg.NatsPassword = os.Getenv("MEDS_NATS_PASSWORD")
+	// check nats username/password
+	if cfg.NatsEnable {
+		cfg.NatsUsername = os.Getenv("MEDS_NATS_USERNAME")
+		cfg.NatsPassword = os.Getenv("MEDS_NATS_PASSWORD")
+		if len(cfg.NatsUsername) < 1 || len(cfg.NatsPassword) < 1 {
+			logger.Raw().Fatal().Msg(`Please set "MEDS_NATS_USERNAME" and "MEDS_NATS_PASSWORD" environment variables`)
+		}
+	}
 
 	logger.Raw().Info().Msg("Running Meds...")
 
@@ -158,7 +163,7 @@ func main() {
 	}
 
 	// create nats client
-	natsClient, err := nclient.Connect("", nclient.InProcessServer(natsServer))
+	natsClient, err := nclient.Connect("", nclient.InProcessServer(natsServer), nclient.UserInfo(cfg.NatsUsername, cfg.NatsPassword))
 	if err != nil {
 		logger.Raw().Fatal().Err(err).Msg("nats client connect failed")
 	}
