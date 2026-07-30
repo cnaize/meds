@@ -1,7 +1,7 @@
 package api
 
 //	@title			Meds
-//	@version		v1.3.2
+//	@version		v1.4.0
 //	@description	Hybrid firewall using public blocklists
 //
 //	@contact.name	cnaize

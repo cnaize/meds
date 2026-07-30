@@ -1,4 +1,4 @@
-package ip
+package ja3
 
 import (
 	"bufio"
@@ -7,38 +7,37 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gaissmai/bart"
+	"github.com/nats-io/nats.go"
 
-	"github.com/cnaize/meds/lib/util/get"
 	"github.com/cnaize/meds/src/core/filter"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/types"
 )
 
-var _ filter.Filter = (*Spamhaus)(nil)
+var _ filter.Filter = (*AbuseCH)(nil)
 
-type Spamhaus struct {
+type AbuseCH struct {
 	*Base
 }
 
-func NewSpamhaus(urls []string, logger *logger.Logger, include, exclude *types.IPList) *Spamhaus {
-	return &Spamhaus{
-		Base: NewBase(urls, logger, include, exclude),
+func NewAbuseCH(urls []string, nc *nats.Conn, logger *logger.Logger, include, exclude *types.MapList[string]) *AbuseCH {
+	return &AbuseCH{
+		Base: NewBase(urls, nc, logger, include, exclude),
 	}
 }
 
-func (f *Spamhaus) Name() string {
-	return "Spamhaus"
+func (f *AbuseCH) Name() string {
+	return "AbuseCH"
 }
 
-func (f *Spamhaus) Load(ctx context.Context) error {
+func (f *AbuseCH) Load(ctx context.Context) error {
 	defer f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
 
 	return f.Base.Load(ctx)
 }
 
-func (f *Spamhaus) Update(ctx context.Context) error {
-	blocklist := new(bart.Lite)
+func (f *AbuseCH) Update(ctx context.Context) error {
+	blocklist := make(map[string]struct{})
 	for _, u := range f.urls {
 		if err := func(u string) error {
 			// create request
@@ -63,21 +62,16 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 			scanner := bufio.NewScanner(resp.Body)
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())
-				if len(line) < 1 || strings.HasPrefix(line, ";") {
+				if len(line) < 1 || strings.HasPrefix(line, "#") {
 					continue
 				}
 
-				fields := strings.Fields(line)
+				fields := strings.Split(line, ",")
 				if len(fields) < 1 {
 					continue
 				}
 
-				subnet, ok := get.Subnet(fields[0])
-				if !ok {
-					continue
-				}
-
-				blocklist.Insert(subnet)
+				blocklist[fields[0]] = struct{}{}
 			}
 
 			return nil
@@ -90,9 +84,9 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 		Info().
 		Str("name", f.Name()).
 		Str("type", string(f.Type())).
-		Int("size", blocklist.Size()).
+		Int("size", len(blocklist)).
 		Msg("Filter updated")
-	f.blocklist.Store(blocklist)
+	f.blocklist.Store(&blocklist)
 
 	return nil
 }

@@ -34,6 +34,19 @@ import (
 	ratefilter "github.com/cnaize/meds/src/core/filter/rate"
 )
 
+var defaultAllowList = []netip.Prefix{
+	netip.MustParsePrefix("127.0.0.0/8"),
+	netip.MustParsePrefix("169.254.0.0/16"),
+	netip.MustParsePrefix("198.18.0.0/15"),
+	netip.MustParsePrefix("224.0.0.0/4"),
+	netip.MustParsePrefix("240.0.0.0/4"),
+	// for local PC only, otherwise remove it using API
+	netip.MustParsePrefix("10.0.0.0/8"),
+	netip.MustParsePrefix("100.64.0.0/10"),
+	netip.MustParsePrefix("172.16.0.0/12"),
+	netip.MustParsePrefix("192.168.0.0/16"),
+}
+
 func main() {
 	var cfg config.Config
 	// parse config
@@ -50,20 +63,26 @@ func main() {
 	flag.BoolVar(&cfg.NatsEnable, "nats-enable", false, "enable nats server")
 	flag.StringVar(&cfg.NatsHost, "nats-host", "localhost", "nats server host")
 	flag.IntVar(&cfg.NatsPort, "nats-port", 4222, "nats server port")
-	flag.UintVar(&cfg.QuarantineIPCacheSize, "quarantine-ip-cache-size", 10_000, "quarantine ip cache size (all entities)")
-	flag.DurationVar(&cfg.QuarantineIPEntityTTL, "quarantine-ip-entity-ttl", 3*time.Minute, "quarantine ip cache ttl (per entity)")
+	flag.UintVar(&cfg.QuarantineIPCacheSize, "quarantine-ip-cache-size", 100_000, "quarantine ip cache size (all entities)")
+	flag.DurationVar(&cfg.QuarantineIPEntityTTL, "quarantine-ip-entity-ttl", 15*time.Minute, "quarantine ip cache ttl (per entity)")
 	flag.UintVar(&cfg.LimiterRate, "rate-limiter-rate", 3000, "max packets per second (per ip)")
 	flag.UintVar(&cfg.LimiterBurst, "rate-limiter-burst", 1500, "max packets at once (per ip)")
 	flag.UintVar(&cfg.LimiterCacheSize, "rate-limiter-cache-size", 100_000, "rate limiter cache size (all buckets)")
 	flag.DurationVar(&cfg.LimiterBucketTTL, "rate-limiter-bucket-ttl", 5*time.Minute, "rate limiter cache ttl (per bucket)")
+	flag.BoolVar(&cfg.FilterAbuseIPDBEnable, "filter-abuseipdb-enable", false, "enable abuseipdb filter")
+	flag.IntVar(&cfg.FilterAbuseIPDBConfidence, "filter-abuseipdb-confidence", 100, "abuseipdb filter minimum confidence")
+	flag.BoolVar(&cfg.FilterAbuseIPDBReportAddr, "filter-abuseipdb-report-addr", false, "report quarantine addresses to abuseipdb")
 
 	// NOTE: set using "MEDS_USERNAME" and "MEDS_PASSWORD" environment variables
 	// flag.StringVar(&cfg.Username, "username", "admin", "admin username")
 	// flag.StringVar(&cfg.Password, "password", "admin", "admin password")
 
 	// NOTE: set using "MEDS_NATS_USERNAME" and "MEDS_NATS_PASSWORD" environment variables
-	// flag.StringVar(&cfg.NatsUsername, "nats-username", "meds", "nats username")
-	// flag.StringVar(&cfg.NatsPassword, "nats-password", "meds", "nats password")
+	// flag.StringVar(&cfg.NatsUsername, "nats-username", "nats", "nats username")
+	// flag.StringVar(&cfg.NatsPassword, "nats-password", "nats", "nats password")
+
+	// NOTE: set using "MEDS_ABUSEIPDB_API_KEY" environment variable
+	// flag.StringVar(&cfg.FilterAbuseIPDBApiKey, "filter-abuseipdb-api-key", "your_abuseipdb_token", "abuseipdb filter api key")
 
 	flag.Parse()
 
@@ -103,6 +122,14 @@ func main() {
 		cfg.NatsPassword = os.Getenv("MEDS_NATS_PASSWORD")
 		if len(cfg.NatsUsername) < 1 || len(cfg.NatsPassword) < 1 {
 			logger.Raw().Fatal().Msg(`Please set "MEDS_NATS_USERNAME" and "MEDS_NATS_PASSWORD" environment variables`)
+		}
+	}
+
+	// check abuseipdb api key
+	if cfg.FilterAbuseIPDBEnable {
+		cfg.FilterAbuseIPDBApiKey = os.Getenv("MEDS_ABUSEIPDB_API_KEY")
+		if len(cfg.FilterAbuseIPDBApiKey) < 1 {
+			logger.Raw().Fatal().Msg(`Please set "MEDS_ABUSEIPDB_API_KEY" environment variable`)
 		}
 	}
 
@@ -270,20 +297,7 @@ func initDatabase(ctx context.Context, cfg *config.Config, logger *logger.Logger
 
 	// prefill database
 	if isNewDatabase {
-		ipAllowList := []netip.Prefix{
-			netip.MustParsePrefix("127.0.0.0/8"),
-			netip.MustParsePrefix("169.254.0.0/16"),
-			netip.MustParsePrefix("198.18.0.0/15"),
-			netip.MustParsePrefix("224.0.0.0/4"),
-			netip.MustParsePrefix("240.0.0.0/4"),
-			// for local PC only, otherwise remove it using API
-			netip.MustParsePrefix("10.0.0.0/8"),
-			netip.MustParsePrefix("100.64.0.0/10"),
-			netip.MustParsePrefix("172.16.0.0/12"),
-			netip.MustParsePrefix("192.168.0.0/16"),
-		}
-
-		for _, subnet := range ipAllowList {
+		for _, subnet := range defaultAllowList {
 			if err := db.Q.UpsertIPAllowList(ctx, db.DB, subnet.String()); err != nil {
 				return nil, fmt.Errorf("prefill ip allowlist: %w", err)
 			}
@@ -311,13 +325,16 @@ func newFilters(
 	// geofilter.IPLocate is responsible for the ASNList updates
 	asnList := types.NewASNList()
 
-	return []filter.Filter{
+	head := []filter.Filter{
 		// ip allowlist
 		ipfilter.NewAllowList(logger, ipAllowList),
 		// quarantine filter
-		quarantinefilter.NewQuarantineIP(cfg.QuarantineIPCacheSize, cfg.QuarantineIPEntityTTL, natsClient, logger),
+		quarantinefilter.NewQuarantineIP(cfg, natsClient, logger),
 		// rate filter
 		ratefilter.NewLimiter(cfg.LimiterRate, cfg.LimiterBurst, cfg.LimiterCacheSize, cfg.LimiterBucketTTL, natsClient, logger),
+	}
+
+	tail := []filter.Filter{
 		// ip filters
 		ipfilter.NewFireHOL([]string{
 			"https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
@@ -325,7 +342,7 @@ func newFilters(
 		ipfilter.NewSpamhaus([]string{
 			"https://www.spamhaus.org/drop/drop.txt",
 		}, logger, ipIncludeList, ipExcludeList),
-		ipfilter.NewAbuse([]string{
+		ipfilter.NewAbuseCH([]string{
 			"https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
 		}, logger, ipIncludeList, ipExcludeList),
 		// geo filters
@@ -344,10 +361,20 @@ func newFilters(
 			"https://someonewhocares.org/hosts/hosts",
 		}, natsClient, logger, domainIncludeList, domainExcludeList),
 		// ja3 filters
-		ja3filter.NewAbuse([]string{
+		ja3filter.NewAbuseCH([]string{
 			"https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv",
 		}, natsClient, logger, ja3IncludeList, ja3ExcludeList),
 	}
+
+	if cfg.FilterAbuseIPDBEnable {
+		abuseipdb := ipfilter.NewAbuseIPDB([]string{
+			"https://api.abuseipdb.com/api/v2/blacklist",
+		}, cfg.FilterAbuseIPDBApiKey, cfg.FilterAbuseIPDBConfidence, logger, ipIncludeList, ipExcludeList)
+
+		return append(append(head, abuseipdb), tail...)
+	}
+
+	return append(head, tail...)
 }
 
 func loadIPLists(ctx context.Context, db *database.Database) (*types.IPList, *types.IPList, error) {

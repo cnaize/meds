@@ -15,29 +15,29 @@ import (
 	"github.com/cnaize/meds/src/types"
 )
 
-var _ filter.Filter = (*Spamhaus)(nil)
+var _ filter.Filter = (*AbuseCH)(nil)
 
-type Spamhaus struct {
+type AbuseCH struct {
 	*Base
 }
 
-func NewSpamhaus(urls []string, logger *logger.Logger, include, exclude *types.IPList) *Spamhaus {
-	return &Spamhaus{
+func NewAbuseCH(urls []string, logger *logger.Logger, include, exclude *types.IPList) *AbuseCH {
+	return &AbuseCH{
 		Base: NewBase(urls, logger, include, exclude),
 	}
 }
 
-func (f *Spamhaus) Name() string {
-	return "Spamhaus"
+func (f *AbuseCH) Name() string {
+	return "AbuseCH"
 }
 
-func (f *Spamhaus) Load(ctx context.Context) error {
+func (f *AbuseCH) Load(ctx context.Context) error {
 	defer f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
 
 	return f.Base.Load(ctx)
 }
 
-func (f *Spamhaus) Update(ctx context.Context) error {
+func (f *AbuseCH) Update(ctx context.Context) error {
 	blocklist := new(bart.Lite)
 	for _, u := range f.urls {
 		if err := func(u string) error {
@@ -63,16 +63,11 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 			scanner := bufio.NewScanner(resp.Body)
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())
-				if len(line) < 1 || strings.HasPrefix(line, ";") {
+				if len(line) < 1 || strings.HasPrefix(line, "#") {
 					continue
 				}
 
-				fields := strings.Fields(line)
-				if len(fields) < 1 {
-					continue
-				}
-
-				subnet, ok := get.Subnet(fields[0])
+				subnet, ok := get.Subnet(line)
 				if !ok {
 					continue
 				}

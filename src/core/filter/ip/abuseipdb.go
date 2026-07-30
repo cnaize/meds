@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gaissmai/bart"
@@ -15,37 +17,52 @@ import (
 	"github.com/cnaize/meds/src/types"
 )
 
-var _ filter.Filter = (*Spamhaus)(nil)
+var _ filter.Filter = (*AbuseIPDB)(nil)
 
-type Spamhaus struct {
+type AbuseIPDB struct {
 	*Base
+
+	apiKey     string
+	confidence int
 }
 
-func NewSpamhaus(urls []string, logger *logger.Logger, include, exclude *types.IPList) *Spamhaus {
-	return &Spamhaus{
-		Base: NewBase(urls, logger, include, exclude),
+func NewAbuseIPDB(urls []string, apiKey string, confidence int, logger *logger.Logger, include, exclude *types.IPList) *AbuseIPDB {
+	return &AbuseIPDB{
+		Base:       NewBase(urls, logger, include, exclude),
+		apiKey:     apiKey,
+		confidence: confidence,
 	}
 }
 
-func (f *Spamhaus) Name() string {
-	return "Spamhaus"
+func (f *AbuseIPDB) Name() string {
+	return "AbuseIPDB"
 }
 
-func (f *Spamhaus) Load(ctx context.Context) error {
+func (f *AbuseIPDB) Load(ctx context.Context) error {
 	defer f.logger.Raw().Info().Str("name", f.Name()).Str("type", string(f.Type())).Msg("Filter loaded")
 
 	return f.Base.Load(ctx)
 }
 
-func (f *Spamhaus) Update(ctx context.Context) error {
+func (f *AbuseIPDB) Update(ctx context.Context) error {
 	blocklist := new(bart.Lite)
 	for _, u := range f.urls {
 		if err := func(u string) error {
+			// create params
+			params := make(url.Values)
+			params.Set("ipVersion", "4")
+			params.Set("limit", "9999999")
+			params.Set("confidenceMinimum", strconv.Itoa(f.confidence))
+
 			// create request
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?%s", u, params.Encode()), nil)
 			if err != nil {
 				return fmt.Errorf("new request: %w", err)
 			}
+
+			// add headers
+			req.Header.Set("Key", f.apiKey)
+			req.Header.Set("Accept", "text/plain")
 
 			// do request
 			resp, err := http.DefaultClient.Do(req)
@@ -63,16 +80,11 @@ func (f *Spamhaus) Update(ctx context.Context) error {
 			scanner := bufio.NewScanner(resp.Body)
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())
-				if len(line) < 1 || strings.HasPrefix(line, ";") {
+				if len(line) < 1 || strings.HasPrefix(line, "#") {
 					continue
 				}
 
-				fields := strings.Fields(line)
-				if len(fields) < 1 {
-					continue
-				}
-
-				subnet, ok := get.Subnet(fields[0])
+				subnet, ok := get.Subnet(line)
 				if !ok {
 					continue
 				}

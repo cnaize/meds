@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.3.2-blue)
+![Version](https://img.shields.io/badge/version-v1.4.0-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ---
@@ -47,6 +47,12 @@ Usage of meds:
     	api server address (default ":8000")
   -db-path string
     	path to database file (default "meds.db")
+  -filter-abuseipdb-confidence int
+    	abuseipdb filter minimum confidence (default 100)
+  -filter-abuseipdb-enable
+    	enable abuseipdb filter
+  -filter-abuseipdb-report-addr
+    	report quarantine addresses to abuseipdb
   -log-level string
     	zerolog level (default "info")
   -logger-queue-len uint
@@ -60,9 +66,9 @@ Usage of meds:
   -nats-port int
     	nats server port (default 4222)
   -quarantine-ip-cache-size uint
-    	quarantine ip cache size (all entities) (default 10000)
+    	quarantine ip cache size (all entities) (default 100000)
   -quarantine-ip-entity-ttl duration
-    	quarantine ip cache ttl (per entity) (default 3m0s)
+    	quarantine ip cache ttl (per entity) (default 15m0s)
   -rate-limiter-bucket-ttl duration
     	rate limiter cache ttl (per bucket) (default 5m0s)
   -rate-limiter-burst uint
@@ -82,6 +88,13 @@ Usage of meds:
   -workers-count uint
     	nfqueue workers count (per reader) (default 1)
 ```
+
+### Environment Variables
+  - `MEDS_USERNAME=admin_username`
+  - `MEDS_PASSWORD=admin_password`
+  - `MEDS_NATS_USERNAME=nats_username`
+  - `MEDS_NATS_PASSWORD=nats_password`
+  - `MEDS_ABUSEIPDB_API_KEY=your_abuseipdb_token`
 
 ---
 
@@ -129,9 +142,7 @@ Usage of meds:
 
 - **Deep Inspection**: Only new or unclassified traffic (the "Decision Phase") is sent to Meds for deep L3/L4/L7 analysis. This phase is limited to a **10-packet window** to extract metadata (DNS, SNI, JA3) before the kernel takes over.
 
-- **Reactive Threat Offloading**: External applications or internal filters can stream detected malicious IPs to the embedded NATS server:
-  - Publish to `meds.quarantine.ip.add` (payload: `"1.2.3.4"`) to add the IP to the quarantine
-  - Publish to `meds.quarantine.ip.del` (payload: `"1.2.3.4"`) to delete the IP from the quarantine
+- **Reactive Threat Offloading**: External applications or internal filters can stream detected malicious IPs to the embedded NATS server.
 
 ---
 
@@ -144,7 +155,9 @@ Usage of meds:
   Intercepts traffic using `NFQUEUE` with `balance` and `bypass` options, ensuring multi-core scaling and system stability even if the user-space process is restarted.
 
 - **Embedded NATS**  
-  Exposes an asynchronous reactive API for external applications to offload detected threat vectors to the L3/L4 network layer quarantine.
+  Exposes an asynchronous reactive API for external applications to offload detected threat vectors to the L3/L4 network layer quarantine:  
+  - Publish to `meds.quarantine.ip.add` (payload: `"1.2.3.4"`) to add the IP to the quarantine
+  - Publish to `meds.quarantine.ip.del` (payload: `"1.2.3.4"`) to delete the IP from the quarantine
 
 - **Lock-free Core Architecture**  
   The core engine is built for high-concurrency performance: no mutexes in the hot path. All filtering, counters, and rate-limiters utilize atomic operations.
@@ -154,6 +167,7 @@ Usage of meds:
 
 - **Blocklist-based filtering**  
   - IP blocklists: [FireHOL](https://iplists.firehol.org/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [Abuse.ch](https://abuse.ch/)
+    - [Optional] [AbuseIPDB](https://www.abuseipdb.com/) with the ability to send reports
   - ASN blocklists: [Spamhaus ASN DROP](https://www.spamhaus.org/drop/asndrop.json) using [IPLocate.io](https://iplocate.io/) for IP-to-ASN mapping
   - Domain blocklists: [StevenBlack hosts](https://github.com/StevenBlack/hosts/), [SomeoneWhoCares hosts](https://someonewhocares.org/hosts/)
 
@@ -189,18 +203,19 @@ Usage of meds:
 ```text
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="default"} 5622
-meds_core_packets_accepted_total{filter="ip",reason="AllowList"} 117
+meds_core_packets_accepted_total{filter="empty",reason="default"} 8090
+meds_core_packets_accepted_total{filter="ip",reason="AllowList"} 714
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 11
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 572
-meds_core_packets_dropped_total{filter="ip",reason="Quarantine"} 19
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 21
+meds_core_packets_dropped_total{filter="ip",reason="AbuseIPDB"} 2634
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 2415
+meds_core_packets_dropped_total{filter="ip",reason="Quarantine"} 406
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 6341
+meds_core_packets_processed_total 14280
 ```
 
 ---

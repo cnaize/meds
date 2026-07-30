@@ -43,70 +43,81 @@ func (f *IPLocate) Load(ctx context.Context) error {
 
 func (f *IPLocate) Update(ctx context.Context) error {
 	asnlist := new(bart.Table[types.ASN])
-	for _, url := range f.urls {
-		// create request
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		if err != nil {
-			return fmt.Errorf("%s: new request: %w", url, err)
-		}
-
-		// do request
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("%s: do request: %w", url, err)
-		}
-		defer resp.Body.Close()
-
-		// unzip body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("read all: %w", err)
-		}
-
-		reader := bytes.NewReader(body)
-		archive, err := zip.NewReader(reader, reader.Size())
-		if err != nil {
-			return fmt.Errorf("new zip reader: %w", err)
-		}
-
-		for _, file := range archive.File {
-			if file.FileInfo().IsDir() {
-				continue
-			}
-
-			data, err := file.Open()
+	for _, u := range f.urls {
+		if err := func(u string) error {
+			// create request
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 			if err != nil {
-				return fmt.Errorf("%s: open zip file: %w", file.Name, err)
+				return fmt.Errorf("new request: %w", err)
 			}
 
-			// scan list
-			scanner := bufio.NewScanner(data)
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if len(line) < 1 {
+			// do request
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return fmt.Errorf("do request: %w", err)
+			}
+			defer resp.Body.Close()
+
+			// check status
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("status code: %d", resp.StatusCode)
+			}
+
+			// unzip body
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("read all: %w", err)
+			}
+
+			reader := bytes.NewReader(body)
+			archive, err := zip.NewReader(reader, reader.Size())
+			if err != nil {
+				return fmt.Errorf("new zip reader: %w", err)
+			}
+
+			for _, file := range archive.File {
+				if file.FileInfo().IsDir() {
 					continue
 				}
 
-				fields := strings.Split(line, ",")
-				if len(fields) < 3 {
-					continue
-				}
-
-				subnet, ok := get.Subnet(fields[0])
-				if !ok {
-					continue
-				}
-
-				asn, err := strconv.ParseUint(fields[1], 10, 32)
+				data, err := file.Open()
 				if err != nil {
-					continue
+					return fmt.Errorf("%s: open zip file: %w", file.Name, err)
 				}
 
-				asnlist.Insert(subnet, types.ASN{
-					ASN:     uint32(asn),
-					Country: strings.ToLower(fields[2]),
-				})
+				// scan list
+				scanner := bufio.NewScanner(data)
+				for scanner.Scan() {
+					line := strings.TrimSpace(scanner.Text())
+					if len(line) < 1 {
+						continue
+					}
+
+					fields := strings.Split(line, ",")
+					if len(fields) < 3 {
+						continue
+					}
+
+					subnet, ok := get.Subnet(fields[0])
+					if !ok {
+						continue
+					}
+
+					asn, err := strconv.ParseUint(fields[1], 10, 32)
+					if err != nil {
+						continue
+					}
+
+					asnlist.Insert(subnet, types.ASN{
+						ASN:     uint32(asn),
+						Country: strings.ToLower(fields[2]),
+					})
+				}
 			}
+
+			return nil
+		}(u); err != nil {
+			return fmt.Errorf("%s: %w", u, err)
 		}
 	}
 

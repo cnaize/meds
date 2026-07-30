@@ -34,4 +34,9 @@ type Config struct {
 	LimiterBurst     uint
 	LimiterCacheSize uint
 	LimiterBucketTTL time.Duration
+	// abuseipdb filter
+	FilterAbuseIPDBEnable     bool
+	FilterAbuseIPDBApiKey     string
+	FilterAbuseIPDBConfidence int
+	FilterAbuseIPDBReportAddr bool
 }

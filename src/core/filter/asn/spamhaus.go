@@ -37,37 +37,48 @@ func (f *Spamhaus) Load(ctx context.Context) error {
 
 func (f *Spamhaus) Update(ctx context.Context) error {
 	blocklist := make(map[uint32]struct{})
-	for _, url := range f.urls {
-		// create request
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		if err != nil {
-			return fmt.Errorf("%s: new request: %w", url, err)
-		}
-
-		// do request
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("%s: do request: %w", url, err)
-		}
-		defer resp.Body.Close()
-
-		// scan list
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if len(line) < 1 {
-				continue
+	for _, u := range f.urls {
+		if err := func(u string) error {
+			// create request
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+			if err != nil {
+				return fmt.Errorf("new request: %w", err)
 			}
 
-			var entry struct {
-				ASN uint32 `json:"asn"`
+			// do request
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return fmt.Errorf("do request: %w", err)
+			}
+			defer resp.Body.Close()
+
+			// check status
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("status code: %d", resp.StatusCode)
 			}
 
-			if err := json.Unmarshal([]byte(line), &entry); err != nil {
-				continue
+			// scan list
+			scanner := bufio.NewScanner(resp.Body)
+			for scanner.Scan() {
+				line := strings.TrimSpace(scanner.Text())
+				if len(line) < 1 {
+					continue
+				}
+
+				var entry struct {
+					ASN uint32 `json:"asn"`
+				}
+
+				if err := json.Unmarshal([]byte(line), &entry); err != nil {
+					continue
+				}
+
+				blocklist[entry.ASN] = struct{}{}
 			}
 
-			blocklist[entry.ASN] = struct{}{}
+			return nil
+		}(u); err != nil {
+			return fmt.Errorf("%s: %w", u, err)
 		}
 	}
 

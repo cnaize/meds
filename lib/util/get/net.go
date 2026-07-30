@@ -72,11 +72,17 @@ func Subnet(str string) (netip.Prefix, bool) {
 		return prefix, true
 	}
 
-	if ip, err := netip.ParseAddr(str); err == nil && ip.Is4() {
-		return netip.PrefixFrom(ip, 32), true
+	ip, err := netip.ParseAddr(str)
+	if err != nil {
+		return netip.Prefix{}, false
+	}
+	ip = ip.Unmap()
+
+	if !ip.Is4() {
+		return netip.Prefix{}, false
 	}
 
-	return netip.Prefix{}, false
+	return netip.PrefixFrom(ip, 32), true
 }
 
 func Subnets(strs []string) ([]netip.Prefix, error) {

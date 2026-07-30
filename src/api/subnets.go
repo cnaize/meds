@@ -127,7 +127,7 @@ func subnetListLookup(list *types.IPList, mu *sync.Mutex) func(*gin.Context) {
 		defer mu.Unlock()
 
 		c.JSON(http.StatusOK, CheckSubnetResp{
-			Found: list.Lookup(addr),
+			Found: list.Lookup(addr.Unmap()),
 		})
 	}
 }
