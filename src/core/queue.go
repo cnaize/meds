@@ -39,7 +39,7 @@ func NewQueue(cfg *config.Config, filters []filter.Filter, logger *logger.Logger
 	workers := make([]*Worker, 0, cfg.ReadersCount*cfg.WorkersCount)
 	// WARNING: always balancing NFQUEUE from 0
 	for qnum := 0; qnum < int(cfg.ReadersCount); qnum++ {
-		reader := NewReader(uint16(qnum), uint32(cfg.ReaderQLen), logger)
+		reader := NewReader(uint16(qnum), uint32(cfg.ReaderQLen), cfg.AcceptOnFail, logger)
 		readers = append(readers, reader)
 
 		// workers per reader

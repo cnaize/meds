@@ -13,6 +13,7 @@ type Config struct {
 	LoggersCount uint
 	ReaderQLen   uint
 	LoggerQLen   uint
+	AcceptOnFail bool
 	// filters
 	UpdateTimeout  time.Duration
 	UpdateInterval time.Duration

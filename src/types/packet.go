@@ -64,6 +64,12 @@ func NewPacket(payload []byte) *Packet {
 	}
 }
 
+func (p *Packet) Detach() *Packet {
+	p.packet = nil
+
+	return p
+}
+
 func (p *Packet) GetProto() (layers.IPProtocol, bool) {
 	// check
 	if p.isTouched(packetKeyProto) {

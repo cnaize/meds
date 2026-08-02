@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.4.0-blue)
+![Version](https://img.shields.io/badge/version-v1.4.1-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ---
@@ -43,6 +43,8 @@ sudo MEDS_USERNAME=admin MEDS_PASSWORD=mypass meds
 ### Command-line options
 ```text
 Usage of meds:
+  -accept-on-fail
+    	auto accept packets on nfqueue fail
   -api-addr string
     	api server address (default ":8000")
   -db-path string

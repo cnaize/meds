@@ -58,6 +58,7 @@ func main() {
 	flag.UintVar(&cfg.LoggersCount, "loggers-count", uint(max(1, runtime.GOMAXPROCS(0)/4)), "logger workers count")
 	flag.UintVar(&cfg.ReaderQLen, "reader-queue-len", 8192, "nfqueue queue length (per reader)")
 	flag.UintVar(&cfg.LoggerQLen, "logger-queue-len", 2048, "logger queue length (all workers)")
+	flag.BoolVar(&cfg.AcceptOnFail, "accept-on-fail", false, "auto accept packets on nfqueue fail")
 	flag.DurationVar(&cfg.UpdateTimeout, "update-timeout", time.Minute, "update timeout (per filter)")
 	flag.DurationVar(&cfg.UpdateInterval, "update-interval", 4*time.Hour, "update frequency")
 	flag.BoolVar(&cfg.NatsEnable, "nats-enable", false, "enable nats server")

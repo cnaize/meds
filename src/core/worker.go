@@ -56,7 +56,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 	packet := types.NewPacket(*a.Payload)
 	if _, ok := packet.GetSrcIP(); !ok {
 		w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "unknown packet", filter.FilterTypeIP, packet))
+		w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "unknown packet", filter.FilterTypeIP, packet.Detach()))
 
 		return
 	}
@@ -73,7 +73,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 					nfqueue.WithMark(mark),
 					nfqueue.WithConnMark(mark),
 				)
-				w.logger.Log(event.NewAccept(zerolog.InfoLevel, "connection accepted", checker.Name(), checker.Type(), packet))
+				w.logger.Log(event.NewAccept(zerolog.InfoLevel, "connection accepted", checker.Name(), checker.Type(), packet.Detach()))
 
 				return
 			}
@@ -87,7 +87,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 					nfqueue.WithMark(mark),
 					nfqueue.WithConnMark(mark),
 				)
-				w.logger.Log(event.NewDrop(zerolog.InfoLevel, "connection dropped", checker.Name(), checker.Type(), packet))
+				w.logger.Log(event.NewDrop(zerolog.InfoLevel, "connection dropped", checker.Name(), checker.Type(), packet.Detach()))
 
 				return
 			}
@@ -96,7 +96,7 @@ func (w *Worker) handle(a nfqueue.Attribute) {
 
 	// accept by default
 	w.nfq.SetVerdict(*a.PacketID, nfqueue.NfAccept)
-	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", filter.FilterTypeEmpty, packet))
+	w.logger.Log(event.NewAccept(zerolog.DebugLevel, "packet accepted", "default", filter.FilterTypeEmpty, packet.Detach()))
 }
 
 func addMark(a nfqueue.Attribute, mark uint32) uint32 {

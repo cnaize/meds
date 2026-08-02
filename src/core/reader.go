@@ -7,6 +7,7 @@ import (
 	"github.com/florianl/go-nfqueue/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/cnaize/meds/lib/util/convert"
 	"github.com/cnaize/meds/src/core/logger"
 	"github.com/cnaize/meds/src/core/logger/event"
 )
@@ -14,6 +15,7 @@ import (
 type Reader struct {
 	qnum uint16
 	qlen uint32
+	aonf bool
 
 	logger *logger.Logger
 
@@ -21,10 +23,11 @@ type Reader struct {
 	wch chan nfqueue.Attribute
 }
 
-func NewReader(qnum uint16, qlen uint32, logger *logger.Logger) *Reader {
+func NewReader(qnum uint16, qlen uint32, acceptOnFail bool, logger *logger.Logger) *Reader {
 	return &Reader{
 		qnum:   qnum,
 		qlen:   qlen,
+		aonf:   acceptOnFail,
 		logger: logger,
 		wch:    make(chan nfqueue.Attribute, qlen),
 	}
@@ -42,6 +45,7 @@ func (r *Reader) Run(ctx context.Context) error {
 		MaxQueueLen:  r.qlen,
 		Copymode:     nfqueue.NfQnlCopyPacket,
 		MaxPacketLen: 0xFFFF,
+		Flags:        (convert.BoolToUint32(r.aonf) * nfqueue.NfQaCfgFlagFailOpen),
 	})
 	if err != nil {
 		return fmt.Errorf("open: %w", err)

@@ -8,45 +8,50 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-
-	"github.com/cnaize/meds/lib/util"
 )
 
 func Proto(packet gopacket.Packet) (layers.IPProtocol, bool) {
-	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
-	if !ok {
-		return 0, false
+	if ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4); ok {
+		return ip4.Protocol, true
 	}
 
-	return ip4.Protocol, true
+	return 0, false
 }
 
 func SrcIP(packet gopacket.Packet) (netip.Addr, bool) {
 	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
-	if !ok || len(ip4.SrcIP) != 4 {
+	if !ok {
 		return netip.Addr{}, false
 	}
 
-	return netip.AddrFrom4(*(*[4]byte)(ip4.SrcIP)).Unmap(), true
+	ip, ok := netip.AddrFromSlice(ip4.SrcIP)
+	if !ok {
+		return netip.Addr{}, false
+	}
+
+	return ip.Unmap(), true
 }
 
 func DstIP(packet gopacket.Packet) (netip.Addr, bool) {
 	ip4, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
-	if !ok || len(ip4.DstIP) != 4 {
+	if !ok {
 		return netip.Addr{}, false
 	}
 
-	return netip.AddrFrom4(*(*[4]byte)(ip4.DstIP)).Unmap(), true
+	ip, ok := netip.AddrFromSlice(ip4.DstIP)
+	if !ok {
+		return netip.Addr{}, false
+	}
+
+	return ip.Unmap(), true
 }
 
 func SrcPort(packet gopacket.Packet) (uint16, bool) {
-	tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
-	if ok {
+	if tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP); ok {
 		return uint16(tcp.SrcPort), true
 	}
 
-	udp, ok := packet.Layer(layers.LayerTypeUDP).(*layers.UDP)
-	if ok {
+	if udp, ok := packet.Layer(layers.LayerTypeUDP).(*layers.UDP); ok {
 		return uint16(udp.SrcPort), true
 	}
 
@@ -54,13 +59,11 @@ func SrcPort(packet gopacket.Packet) (uint16, bool) {
 }
 
 func DstPort(packet gopacket.Packet) (uint16, bool) {
-	tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
-	if ok {
+	if tcp, ok := packet.Layer(layers.LayerTypeTCP).(*layers.TCP); ok {
 		return uint16(tcp.DstPort), true
 	}
 
-	udp, ok := packet.Layer(layers.LayerTypeUDP).(*layers.UDP)
-	if ok {
+	if udp, ok := packet.Layer(layers.LayerTypeUDP).(*layers.UDP); ok {
 		return uint16(udp.DstPort), true
 	}
 
@@ -86,13 +89,13 @@ func Subnet(str string) (netip.Prefix, bool) {
 }
 
 func Subnets(strs []string) ([]netip.Prefix, error) {
-	subnets := make([]netip.Prefix, len(strs))
-	for i, str := range strs {
+	subnets := make([]netip.Prefix, 0, len(strs))
+	for _, str := range strs {
 		subnet, ok := Subnet(str)
 		if !ok {
 			return nil, fmt.Errorf("parse: %s", str)
 		}
-		subnets[i] = subnet
+		subnets = append(subnets, subnet)
 	}
 
 	return subnets, nil
@@ -110,7 +113,7 @@ func DNSQuestions(packet gopacket.Packet) []string {
 			continue
 		}
 
-		questions = append(questions, util.BytesToString(question.Name))
+		questions = append(questions, string(question.Name))
 	}
 
 	return questions
@@ -128,7 +131,7 @@ func DNSAnswers(packet gopacket.Packet) []string {
 			continue
 		}
 
-		answers = append(answers, util.BytesToString(answer.CNAME))
+		answers = append(answers, string(answer.CNAME))
 	}
 
 	return answers
@@ -147,7 +150,7 @@ func DNSDomains(packet gopacket.Packet) []string {
 			continue
 		}
 
-		domains = append(domains, util.BytesToString(question.Name))
+		domains = append(domains, string(question.Name))
 	}
 	// collect answers
 	for _, answer := range dns.Answers {
@@ -155,7 +158,7 @@ func DNSDomains(packet gopacket.Packet) []string {
 			continue
 		}
 
-		domains = append(domains, util.BytesToString(answer.CNAME))
+		domains = append(domains, string(answer.CNAME))
 	}
 
 	return domains
