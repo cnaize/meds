@@ -96,6 +96,7 @@ func (f *QuarantineIP) natsHandler(ctx context.Context) {
 	defer f.sub.Unsubscribe()
 
 	for {
+		// read message
 		msg, err := f.sub.NextMsgWithContext(ctx)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
@@ -106,6 +107,7 @@ func (f *QuarantineIP) natsHandler(ctx context.Context) {
 
 		addr := string(bytes.TrimSpace(msg.Data))
 
+		// parse address
 		ip, err := netip.ParseAddr(addr)
 		if err != nil {
 			f.logger.Raw().Warn().Err(err).Str("name", f.Name()).Str("type", string(f.Type())).Msg("parse nats msg failed")
@@ -117,9 +119,11 @@ func (f *QuarantineIP) natsHandler(ctx context.Context) {
 			continue
 		}
 
+		// handle subject
 		switch msg.Subject {
 		case pkg.NatsSubjectQuarantineIPAdd:
 			_, set := f.cache.SetIfAbsent(ip, struct{}{})
+
 			// report address
 			if f.cfg.FilterAbuseIPDBEnable && f.cfg.FilterAbuseIPDBReportAddr && set {
 				go func(ctx context.Context, addr string) {

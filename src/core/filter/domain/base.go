@@ -53,8 +53,9 @@ func (f *Base) Check(packet *types.Packet) bool {
 		if f.include.Lookup(domain) || f.blocklist.Lookup(domain) {
 			// add src ip to quarantine
 			if srcIP, ok := packet.GetSrcIP(); ok {
-				f.nc.Publish(pkg.NatsSubjectQuarantineIPAdd, []byte(srcIP.String()))
+				f.nc.Publish(pkg.NatsSubjectQuarantineIPAdd, srcIP.AppendTo(make([]byte, 0, 16)))
 			}
+
 			return false
 		}
 	}

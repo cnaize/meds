@@ -8,10 +8,11 @@ import (
 	"io/fs"
 	"net/netip"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 	"time"
 
-	"github.com/appleboy/graceful"
 	nserver "github.com/nats-io/nats-server/v2/server"
 	nclient "github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
@@ -94,7 +95,7 @@ func main() {
 	}
 
 	// main context
-	mainCtx, mainCancel := context.WithCancel(context.Background())
+	mainCtx, mainCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer mainCancel()
 
 	// create logger
@@ -218,7 +219,6 @@ func main() {
 	if err := q.Load(mainCtx); err != nil {
 		logger.Raw().Fatal().Err(err).Msg("queue load failed")
 	}
-	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
 	// create server
 	api := server.NewServer(
@@ -236,30 +236,44 @@ func main() {
 		domainExcludeList,
 	)
 
-	m := graceful.NewManager(graceful.WithContext(mainCtx), graceful.WithLogger(graceful.NewLogger()))
-	m.AddRunningJob(func(ctx context.Context) error {
-		defer mainCancel()
-
+	// run application
+	go func() {
 		// run server
-		go func() {
-			defer mainCancel()
+		if err := api.Run(mainCtx); err != nil {
+			logger.Raw().Err(err).Msg("api run failed")
+			mainCancel()
+		}
+	}()
 
-			if err := api.Run(ctx); err != nil {
-				logger.Raw().Err(err).Msg("api run failed")
-			}
-		}()
+	// run queue
+	if err := q.Run(mainCtx); err != nil {
+		logger.Raw().Err(err).Msg("queue run failed")
+		mainCancel()
+	}
+	go q.Update(mainCtx, cfg.UpdateTimeout, cfg.UpdateInterval)
 
-		// run queue
-		if err := q.Run(ctx); err != nil {
-			logger.Raw().Err(err).Msg("queue run failed")
+	// wait for signal
+	<-mainCtx.Done()
+
+	// stop application
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), time.Second)
+	defer stopCancel()
+
+	done := make(chan struct{})
+	go func() {
+		// close queue
+		if err := q.Close(); err != nil {
+			logger.Raw().Err(err).Msg("queue close failed")
 		}
 
-		return nil
-	})
-	m.AddShutdownJob(func() error {
 		// close server
-		if err := api.Close(); err != nil {
+		if err := api.Close(stopCtx); err != nil {
 			logger.Raw().Err(err).Msg("api close failed")
+		}
+
+		// close database
+		if err := db.Close(); err != nil {
+			logger.Raw().Err(err).Msg("database close failed")
 		}
 
 		// stop nats
@@ -268,21 +282,16 @@ func main() {
 		}
 		natsServer.Shutdown()
 
-		// close queue
-		if err := q.Close(); err != nil {
-			logger.Raw().Err(err).Msg("queue close failed")
-		}
+		// application stopped
+		close(done)
+	}()
 
-		// close database
-		if err := db.Close(); err != nil {
-			logger.Raw().Err(err).Msg("database close failed")
-		}
-
-		return nil
-	})
-
-	// wait till the end
-	<-m.Done()
+	select {
+	case <-done:
+		os.Exit(0)
+	case <-stopCtx.Done():
+		os.Exit(1)
+	}
 }
 
 func initDatabase(ctx context.Context, cfg *config.Config, logger *logger.Logger) (*database.Database, error) {

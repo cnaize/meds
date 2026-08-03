@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cnaize/meds.svg)](https://pkg.go.dev/github.com/cnaize/meds)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-linux-blue)
-![Version](https://img.shields.io/badge/version-v1.4.1-blue)
+![Version](https://img.shields.io/badge/version-v1.4.2-blue)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ---
@@ -205,19 +205,20 @@ Usage of meds:
 ```text
 # HELP meds_core_packets_accepted_total Total number of accepted packets
 # TYPE meds_core_packets_accepted_total counter
-meds_core_packets_accepted_total{filter="empty",reason="default"} 8090
-meds_core_packets_accepted_total{filter="ip",reason="AllowList"} 714
+meds_core_packets_accepted_total{filter="empty",reason="default"} 30317
+meds_core_packets_accepted_total{filter="ip",reason="AllowList"} 2299
 
 # HELP meds_core_packets_dropped_total Total number of dropped packets
 # TYPE meds_core_packets_dropped_total counter
-meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 21
-meds_core_packets_dropped_total{filter="ip",reason="AbuseIPDB"} 2634
-meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 2415
-meds_core_packets_dropped_total{filter="ip",reason="Quarantine"} 406
+meds_core_packets_dropped_total{filter="asn",reason="Spamhaus"} 83
+meds_core_packets_dropped_total{filter="domain",reason="StevenBlack"} 1
+meds_core_packets_dropped_total{filter="ip",reason="AbuseIPDB"} 9514
+meds_core_packets_dropped_total{filter="ip",reason="FireHOL"} 5423
+meds_core_packets_dropped_total{filter="ip",reason="Quarantine"} 2812
 
 # HELP meds_core_packets_processed_total Total number of processed packets
 # TYPE meds_core_packets_processed_total counter
-meds_core_packets_processed_total 14280
+meds_core_packets_processed_total 50449
 ```
 
 ---

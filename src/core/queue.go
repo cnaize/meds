@@ -96,8 +96,6 @@ func (q *Queue) Run(ctx context.Context) error {
 		return fmt.Errorf("iptables up: %w", err)
 	}
 
-	// wait till the end
-	<-ctx.Done()
 	return nil
 }
 
@@ -108,7 +106,7 @@ func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 
 		// update filters
 		for _, filter := range q.filters {
-			func() {
+			func(ctx context.Context) {
 				// timeout is per filter
 				ctx, cancel := context.WithTimeout(ctx, timeout)
 				defer cancel()
@@ -124,7 +122,7 @@ func (q *Queue) Update(ctx context.Context, timeout, interval time.Duration) {
 						Str("type", string(filter.Type())).
 						Msg(msg)
 				}
-			}()
+			}(ctx)
 		}
 
 		// wait

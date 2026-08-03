@@ -3,7 +3,6 @@ module github.com/cnaize/meds
 go 1.26
 
 require (
-	github.com/appleboy/graceful v1.3.0
 	github.com/armon/go-radix v1.0.0
 	github.com/coreos/go-iptables v0.8.0
 	github.com/dreadl0ck/ja3 v1.1.0

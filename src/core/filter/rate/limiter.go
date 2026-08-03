@@ -40,11 +40,7 @@ func NewLimiter(rate, burst, cacheSize uint, bucketTTL time.Duration, nc *nats.C
 		bucketTTL: bucketTTL,
 		nc:        nc,
 		logger:    logger,
-		bpool: sync.Pool{
-			New: func() any {
-				return NewBucket(burst)
-			},
-		},
+		bpool:     sync.Pool{New: func() any { return NewBucket(burst) }},
 	}
 }
 
@@ -100,7 +96,7 @@ func (f *Limiter) Check(packet *types.Packet) bool {
 
 	if !bucket.Allow(f.rate, f.burst) {
 		// add src ip to quarantine
-		f.nc.Publish(pkg.NatsSubjectQuarantineIPAdd, []byte(srcIP.String()))
+		f.nc.Publish(pkg.NatsSubjectQuarantineIPAdd, srcIP.AppendTo(make([]byte, 0, 16)))
 		return false
 	}
 

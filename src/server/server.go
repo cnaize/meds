@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -68,9 +67,6 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) Close() error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
+func (s *Server) Close(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
